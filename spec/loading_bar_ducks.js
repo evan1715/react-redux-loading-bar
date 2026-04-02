@@ -1,5 +1,5 @@
-/* eslint import/no-extraneous-dependencies: 0 */
-import expect from 'expect'
+import { describe, it } from 'node:test'
+import assert from 'node:assert/strict'
 
 import {
   loadingBarReducer,
@@ -10,84 +10,105 @@ import {
   showLoading,
   hideLoading,
   resetLoading,
-} from '../src/loading_bar_ducks'
+} from '../src/loading_bar_ducks.js'
 
 describe('loadingBarReducer', () => {
   it('returns the initial state', () => {
-    expect(loadingBarReducer(undefined, {})).toEqual({})
+    assert.deepStrictEqual(loadingBarReducer(undefined, {}), {})
   })
 
   it('handles SHOW', () => {
-    expect(
+    assert.deepStrictEqual(
       loadingBarReducer(undefined, { type: SHOW }),
-    ).toEqual({ [DEFAULT_SCOPE]: 1 })
+      { [DEFAULT_SCOPE]: 1 },
+    )
 
-    expect(
+    assert.deepStrictEqual(
       loadingBarReducer({ [DEFAULT_SCOPE]: 0 }, { type: SHOW }),
-    ).toEqual({ [DEFAULT_SCOPE]: 1 })
+      { [DEFAULT_SCOPE]: 1 },
+    )
 
-    expect(
+    assert.deepStrictEqual(
       loadingBarReducer({ [DEFAULT_SCOPE]: 1 }, { type: SHOW }),
-    ).toEqual({ [DEFAULT_SCOPE]: 2 })
+      { [DEFAULT_SCOPE]: 2 },
+    )
   })
 
   it('handles HIDE', () => {
-    expect(
+    assert.deepStrictEqual(
       loadingBarReducer({ [DEFAULT_SCOPE]: 1 }, { type: HIDE }),
-    ).toEqual({ [DEFAULT_SCOPE]: 0 })
+      { [DEFAULT_SCOPE]: 0 },
+    )
 
-    expect(
+    assert.deepStrictEqual(
       loadingBarReducer(undefined, { type: HIDE }),
-    ).toEqual({ [DEFAULT_SCOPE]: 0 })
+      { [DEFAULT_SCOPE]: 0 },
+    )
 
-    expect(
+    assert.deepStrictEqual(
       loadingBarReducer({ [DEFAULT_SCOPE]: 0 }, { type: HIDE }),
-    ).toEqual({ [DEFAULT_SCOPE]: 0 })
+      { [DEFAULT_SCOPE]: 0 },
+    )
   })
 
   it('handles RESET', () => {
-    expect(
+    assert.deepStrictEqual(
       loadingBarReducer({ [DEFAULT_SCOPE]: 1 }, { type: RESET }),
-    ).toEqual({ [DEFAULT_SCOPE]: 0 })
+      { [DEFAULT_SCOPE]: 0 },
+    )
 
-    expect(
+    assert.deepStrictEqual(
       loadingBarReducer(undefined, { type: RESET }),
-    ).toEqual({ [DEFAULT_SCOPE]: 0 })
+      { [DEFAULT_SCOPE]: 0 },
+    )
 
-    expect(
+    assert.deepStrictEqual(
       loadingBarReducer({ [DEFAULT_SCOPE]: 10 }, { type: RESET }),
-    ).toEqual({ [DEFAULT_SCOPE]: 0 })
+      { [DEFAULT_SCOPE]: 0 },
+    )
   })
 })
 
 describe('actions', () => {
   it('creates an action to show loading bar', () => {
-    expect(showLoading())
-      .toEqual({ type: SHOW, payload: { scope: DEFAULT_SCOPE } })
+    assert.deepStrictEqual(
+      showLoading(),
+      { type: SHOW, payload: { scope: DEFAULT_SCOPE } },
+    )
   })
 
   it('creates an action to show a custom loading bar', () => {
-    expect(showLoading('someScope'))
-      .toEqual({ type: SHOW, payload: { scope: 'someScope' } })
+    assert.deepStrictEqual(
+      showLoading('someScope'),
+      { type: SHOW, payload: { scope: 'someScope' } },
+    )
   })
 
   it('creates an action to hide loading bar', () => {
-    expect(hideLoading())
-      .toEqual({ type: HIDE, payload: { scope: DEFAULT_SCOPE } })
+    assert.deepStrictEqual(
+      hideLoading(),
+      { type: HIDE, payload: { scope: DEFAULT_SCOPE } },
+    )
   })
 
   it('creates an action to hide a custom loading bar', () => {
-    expect(hideLoading('someScope'))
-      .toEqual({ type: HIDE, payload: { scope: 'someScope' } })
+    assert.deepStrictEqual(
+      hideLoading('someScope'),
+      { type: HIDE, payload: { scope: 'someScope' } },
+    )
   })
 
   it('creates an action to reset loading bar', () => {
-    expect(resetLoading())
-      .toEqual({ type: RESET, payload: { scope: DEFAULT_SCOPE } })
+    assert.deepStrictEqual(
+      resetLoading(),
+      { type: RESET, payload: { scope: DEFAULT_SCOPE } },
+    )
   })
 
   it('creates an action to reset a custom loading bar', () => {
-    expect(resetLoading('someScope'))
-      .toEqual({ type: RESET, payload: { scope: 'someScope' } })
+    assert.deepStrictEqual(
+      resetLoading('someScope'),
+      { type: RESET, payload: { scope: 'someScope' } },
+    )
   })
 })

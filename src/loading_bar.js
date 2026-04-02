@@ -1,14 +1,7 @@
-import React, { Component } from 'react'
-import { polyfill } from 'react-lifecycles-compat'
-import {
-  bool,
-  number,
-  object,
-  string,
-} from 'prop-types'
-import { connect } from 'react-redux'
+import { useState, useEffect, useRef, useCallback } from 'react'
+import { useSelector } from 'react-redux'
 
-import { DEFAULT_SCOPE } from './loading_bar_ducks'
+import { DEFAULT_SCOPE } from './loading_bar_ducks.js'
 
 export const UPDATE_TIME = 400
 export const MAX_PROGRESS = 99
@@ -16,217 +9,153 @@ export const PROGRESS_INCREASE = 20
 export const ANIMATION_DURATION = UPDATE_TIME * 2
 export const TERMINATING_ANIMATION_DURATION = UPDATE_TIME / 2
 
-const initialState = {
-  percent: 0,
-  status: 'hidden',
+function newPercent(percent, progressIncrease) {
+  // Use cosine as a smoothing function
+  // It could be any function to slow down progress near the ending 100%
+  const smoothedProgressIncrease = (
+    progressIncrease * Math.cos(percent * (Math.PI / 2 / 100))
+  )
+  return percent + smoothedProgressIncrease
 }
 
-class LoadingBar extends Component {
-  static shouldStart(props, state) {
-    return (
-      props.loading > 0 && ['hidden', 'stopping'].indexOf(state.status) >= 0
-    )
-  }
+export function LoadingBar({
+  loading = 0,
+  scope = DEFAULT_SCOPE,
+  className = '',
+  direction = 'ltr',
+  maxProgress = MAX_PROGRESS,
+  progressIncrease = PROGRESS_INCREASE,
+  showFastActions = false,
+  style: customStyle = {},
+  updateTime = UPDATE_TIME,
+}) {
+  const [percent, setPercent] = useState(0)
+  const [status, setStatus] = useState('hidden')
 
-  static shouldStop(props, state) {
-    return (
-      props.loading === 0 && ['starting', 'running'].indexOf(state.status) >= 0
-    )
-  }
+  const progressIntervalId = useRef(null)
+  const terminatingAnimationTimeoutId = useRef(null)
+  const prevLoadingRef = useRef(loading)
+  const statusRef = useRef(status)
+  const percentRef = useRef(percent)
 
-  static getDerivedStateFromProps(nextProps, prevState) {
-    if (LoadingBar.shouldStart(nextProps, prevState)) {
-      return { status: 'starting' }
-    }
+  // Keep refs in sync
+  statusRef.current = status
+  percentRef.current = percent
 
-    if (LoadingBar.shouldStop(nextProps, prevState)) {
-      return { status: 'stopping' }
-    }
+  const reset = useCallback(() => {
+    terminatingAnimationTimeoutId.current = null
+    setPercent(0)
+    setStatus('hidden')
+  }, [])
 
-    return null
-  }
+  const stop = useCallback(() => {
+    clearInterval(progressIntervalId.current)
+    progressIntervalId.current = null
 
-  constructor(props) {
-    super(props)
-    this.state = { ...initialState }
-  }
+    const currentPercent = percentRef.current
+    const isShown = currentPercent > 0 && currentPercent <= 100
 
-  componentDidMount() {
-    const { status } = this.state
-    if (status === 'starting') {
-      this.start()
-    }
-  }
-
-  componentDidUpdate(prevProps, prevState) {
-    const { status } = this.state
-    if (prevState.status !== status) {
-      if (status === 'starting') {
-        this.start()
-      }
-
-      if (status === 'stopping') {
-        this.stop()
-      }
-    }
-  }
-
-  componentWillUnmount() {
-    clearInterval(this.progressIntervalId)
-    clearTimeout(this.terminatingAnimationTimeoutId)
-  }
-
-  reset = () => {
-    this.terminatingAnimationTimeoutId = null
-    this.setState(initialState)
-  }
-
-  newPercent = (percent, progressIncrease) => {
-    // Use cosine as a smoothing function
-    // It could be any function to slow down progress near the ending 100%
-    const smoothedProgressIncrease = (
-      progressIncrease * Math.cos(percent * (Math.PI / 2 / 100))
-    )
-
-    return percent + smoothedProgressIncrease
-  }
-
-  simulateProgress = () => {
-    this.setState((prevState, { maxProgress, progressIncrease }) => {
-      let { percent } = prevState
-      const newPercent = this.newPercent(percent, progressIncrease)
-
-      if (newPercent <= maxProgress) {
-        percent = newPercent
-      }
-
-      return { percent }
-    })
-  }
-
-  start() {
-    // There could be previous termination animation going, so we need to
-    // cancel it and forcefully reset the Loading Bar before starting
-    // the progress simulation from 0
-    if (this.terminatingAnimationTimeoutId) {
-      clearTimeout(this.terminatingAnimationTimeoutId)
-      this.reset()
-    }
-
-    const { updateTime } = this.props
-    this.progressIntervalId = setInterval(
-      this.simulateProgress,
-      updateTime,
-    )
-    this.setState({ status: 'running' })
-  }
-
-  stop() {
-    const { showFastActions } = this.props
-    clearInterval(this.progressIntervalId)
-    this.progressIntervalId = null
-
-    const terminatingAnimationDuration = (
-      this.isShown() || showFastActions
+    const terminatingDuration = (
+      isShown || showFastActions
         ? TERMINATING_ANIMATION_DURATION : 0
     )
 
-    this.terminatingAnimationTimeoutId = setTimeout(
-      this.reset,
-      terminatingAnimationDuration,
+    terminatingAnimationTimeoutId.current = setTimeout(
+      reset,
+      terminatingDuration,
     )
 
-    this.setState({ percent: 100 })
-  }
+    setPercent(100)
+    setStatus('stopping')
+  }, [showFastActions, reset])
 
-  isShown() {
-    const { percent } = this.state
-    return percent > 0 && percent <= 100
-  }
-
-  buildStyle() {
-    const { status, percent } = this.state
-    const { className, style: customStyle } = this.props
-
-    const animationDuration = (
-      status === 'stopping'
-        ? TERMINATING_ANIMATION_DURATION
-        : ANIMATION_DURATION
-    )
-
-    const style = {
-      width: `${percent}%`,
-      transition: `width ${animationDuration}ms linear 0s`,
-      msTransition: `width ${animationDuration}ms linear 0s`,
-      WebkitTransition: `width ${animationDuration}ms linear 0s`,
-      MozTransition: `width ${animationDuration}ms linear 0s`,
-      OTransition: `width ${animationDuration}ms linear 0s`,
-      willChange: 'width, opacity',
-    }
-    // Use default styling if there's no CSS class applied
-    if (!className) {
-      style.height = '3px'
-      style.backgroundColor = 'red'
-      style.position = 'absolute'
+  const start = useCallback(() => {
+    // Cancel any previous termination animation
+    if (terminatingAnimationTimeoutId.current) {
+      clearTimeout(terminatingAnimationTimeoutId.current)
+      terminatingAnimationTimeoutId.current = null
+      setPercent(0)
+      setStatus('hidden')
     }
 
-    if (this.isShown()) {
-      style.opacity = '1'
-    } else {
-      style.opacity = '0'
-    }
+    progressIntervalId.current = setInterval(() => {
+      setPercent((prev) => {
+        const next = newPercent(prev, progressIncrease)
+        return next <= maxProgress ? next : prev
+      })
+    }, updateTime)
 
-    return { ...style, ...customStyle }
+    setStatus('running')
+  }, [updateTime, progressIncrease, maxProgress])
+
+  // Handle loading prop changes
+  useEffect(() => {
+    const prevLoading = prevLoadingRef.current
+    prevLoadingRef.current = loading
+
+    const currentStatus = statusRef.current
+
+    if (loading > 0 && (currentStatus === 'hidden' || currentStatus === 'stopping')) {
+      // If we were stopping, cancel the termination first
+      if (terminatingAnimationTimeoutId.current) {
+        clearTimeout(terminatingAnimationTimeoutId.current)
+        terminatingAnimationTimeoutId.current = null
+        setPercent(0)
+        setStatus('hidden')
+      }
+      start()
+    } else if (loading === 0 && prevLoading > 0 && (currentStatus === 'running' || currentStatus === 'starting')) {
+      stop()
+    }
+  }, [loading, start, stop])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      clearInterval(progressIntervalId.current)
+      clearTimeout(terminatingAnimationTimeoutId.current)
+    }
+  }, [])
+
+  if (status === 'hidden') {
+    return null
   }
 
-  render() {
-    const { status } = this.state
-    const { direction, className } = this.props
-    if (status === 'hidden') {
-      return <div />
-    }
+  const animationDuration = (
+    status === 'stopping'
+      ? TERMINATING_ANIMATION_DURATION
+      : ANIMATION_DURATION
+  )
 
-    return (
-      <div style={{ direction }}>
-        <div style={this.buildStyle()} className={className} />
-        <div style={{ display: 'table', clear: 'both' }} />
-      </div>
-    )
+  const barStyle = {
+    width: `${percent}%`,
+    transition: `width ${animationDuration}ms linear`,
+    willChange: 'width, opacity',
   }
+
+  // Use default styling if there's no CSS class applied
+  if (!className) {
+    barStyle.height = '3px'
+    barStyle.backgroundColor = 'red'
+    barStyle.position = 'absolute'
+  }
+
+  barStyle.opacity = (percent > 0 && percent <= 100) ? '1' : '0'
+
+  const finalStyle = { ...barStyle, ...customStyle }
+
+  return (
+    <div style={{ direction }}>
+      <div style={finalStyle} className={className} />
+      <div style={{ display: 'table', clear: 'both' }} />
+    </div>
+  )
 }
 
-LoadingBar.propTypes = {
-  className: string,
-  direction: string,
-  loading: number,
-  maxProgress: number,
-  progressIncrease: number,
-  scope: string,
-  showFastActions: bool,
-  style: object,
-  updateTime: number,
+// Connected version using react-redux hooks
+export function ConnectedLoadingBar({ scope = DEFAULT_SCOPE, ...props }) {
+  const loading = useSelector((state) => state.loadingBar[scope])
+  return <LoadingBar {...props} scope={scope} loading={loading || 0} />
 }
 
-LoadingBar.defaultProps = {
-  className: '',
-  direction: 'ltr',
-  loading: 0,
-  maxProgress: MAX_PROGRESS,
-  progressIncrease: PROGRESS_INCREASE,
-  scope: DEFAULT_SCOPE,
-  showFastActions: false,
-  style: {},
-  updateTime: UPDATE_TIME,
-}
-
-const mapStateToProps = (state, ownProps) => ({
-  loading: state.loadingBar[ownProps.scope || DEFAULT_SCOPE],
-})
-
-polyfill(LoadingBar)
-const ConnectedLoadingBar = connect(mapStateToProps)(LoadingBar)
-
-export {
-  LoadingBar,
-  ConnectedLoadingBar as default,
-}
+export default ConnectedLoadingBar

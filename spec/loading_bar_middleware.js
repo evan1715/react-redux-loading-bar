@@ -1,9 +1,23 @@
-/* eslint import/no-extraneous-dependencies: 0 */
-import expect from 'expect'
+import { describe, it } from 'node:test'
+import assert from 'node:assert/strict'
 
-import createMockStore from './helpers/create_mock_store'
-import loadingBarMiddleware from '../src/loading_bar_middleware'
-import { showLoading, hideLoading } from '../src/loading_bar_ducks'
+import loadingBarMiddleware from '../src/loading_bar_middleware.js'
+import { showLoading, hideLoading } from '../src/loading_bar_ducks.js'
+
+function createMockStore(middlewares, mockDispatch) {
+  const store = {
+    getState() {},
+    dispatch: mockDispatch,
+  }
+
+  let dispatch = mockDispatch
+  const chain = middlewares.map((mw) => mw(store))
+  for (let i = chain.length - 1; i >= 0; i--) {
+    dispatch = chain[i](dispatch)
+  }
+
+  return { ...store, dispatch }
+}
 
 describe('loadingBarMiddleware', () => {
   const mockStore = (mockDispatch) => (
@@ -16,7 +30,7 @@ describe('loadingBarMiddleware', () => {
   it('returns a function to handle next', () => {
     const mockDispatch = () => {}
     const nextHandler = loadingBarMiddleware()(mockDispatch)
-    expect(nextHandler).toBeA('function')
+    assert.strictEqual(typeof nextHandler, 'function')
   })
 
   describe('with an action containing "_PENDING" in type', () => {
@@ -29,12 +43,12 @@ describe('loadingBarMiddleware', () => {
 
       const mockDispatch = (action) => {
         const expectedAction = expectedActions.shift()
-        expect(action).toEqual(expectedAction)
+        assert.deepStrictEqual(action, expectedAction)
         return action
       }
 
       mockStore(mockDispatch).dispatch(originalAction)
-      expect(expectedActions.length).toEqual(0)
+      assert.strictEqual(expectedActions.length, 0)
     })
   })
 
@@ -48,12 +62,12 @@ describe('loadingBarMiddleware', () => {
 
       const mockDispatch = (action) => {
         const expectedAction = expectedActions.shift()
-        expect(action).toEqual(expectedAction)
+        assert.deepStrictEqual(action, expectedAction)
         return action
       }
 
       mockStore(mockDispatch).dispatch(originalAction)
-      expect(expectedActions.length).toEqual(0)
+      assert.strictEqual(expectedActions.length, 0)
     })
   })
 
@@ -67,17 +81,16 @@ describe('loadingBarMiddleware', () => {
 
       const mockDispatch = (action) => {
         const expectedAction = expectedActions.shift()
-        expect(action).toEqual(expectedAction)
+        assert.deepStrictEqual(action, expectedAction)
         return action
       }
 
       mockStore(mockDispatch).dispatch(originalAction)
-      expect(expectedActions.length).toEqual(0)
+      assert.strictEqual(expectedActions.length, 0)
     })
   })
 
-  describe('with an action does not containing "_PENDING", "_FULFILLED", '
-           + '"_REJECTED" in type', () => {
+  describe('with an action not containing promise suffixes in type', () => {
     it('does not dispatch SHOW and HIDE actions', () => {
       const originalAction = { type: 'something/RANDOM' }
       const expectedActions = [
@@ -86,12 +99,12 @@ describe('loadingBarMiddleware', () => {
 
       const mockDispatch = (action) => {
         const expectedAction = expectedActions.shift()
-        expect(action).toEqual(expectedAction)
+        assert.deepStrictEqual(action, expectedAction)
         return action
       }
 
       mockStore(mockDispatch).dispatch(originalAction)
-      expect(expectedActions.length).toEqual(0)
+      assert.strictEqual(expectedActions.length, 0)
     })
   })
 
@@ -104,12 +117,12 @@ describe('loadingBarMiddleware', () => {
 
       const mockDispatch = (action) => {
         const expectedAction = expectedActions.shift()
-        expect(action).toEqual(expectedAction)
+        assert.strictEqual(action, expectedAction)
         return action
       }
 
       mockStore(mockDispatch).dispatch(originalAction)
-      expect(expectedActions.length).toEqual(0)
+      assert.strictEqual(expectedActions.length, 0)
     })
   })
 
@@ -133,15 +146,15 @@ describe('loadingBarMiddleware', () => {
 
       const mockDispatch = (action) => {
         const expectedAction = expectedActions.shift()
-        expect(action).toEqual(expectedAction)
+        assert.deepStrictEqual(action, expectedAction)
         return action
       }
 
       mockStoreWithSuffixes(mockDispatch).dispatch(originalAction)
-      expect(expectedActions.length).toEqual(0)
+      assert.strictEqual(expectedActions.length, 0)
     })
 
-    it('dispatches SHOW action on _REQUEST action', () => {
+    it('dispatches SHOW action on _LOAD action', () => {
       const originalAction = { type: 'something/FETCH_LOAD' }
       const expectedActions = [
         showLoading(),
@@ -150,12 +163,12 @@ describe('loadingBarMiddleware', () => {
 
       const mockDispatch = (action) => {
         const expectedAction = expectedActions.shift()
-        expect(action).toEqual(expectedAction)
+        assert.deepStrictEqual(action, expectedAction)
         return action
       }
 
       mockStoreWithSuffixes(mockDispatch).dispatch(originalAction)
-      expect(expectedActions.length).toEqual(0)
+      assert.strictEqual(expectedActions.length, 0)
     })
 
     it('dispatches HIDE action on _SUCCESS action', () => {
@@ -167,15 +180,15 @@ describe('loadingBarMiddleware', () => {
 
       const mockDispatch = (action) => {
         const expectedAction = expectedActions.shift()
-        expect(action).toEqual(expectedAction)
+        assert.deepStrictEqual(action, expectedAction)
         return action
       }
 
       mockStoreWithSuffixes(mockDispatch).dispatch(originalAction)
-      expect(expectedActions.length).toEqual(0)
+      assert.strictEqual(expectedActions.length, 0)
     })
 
-    it('dispatches HIDE action on _FAILURE action', () => {
+    it('dispatches HIDE action on _FAIL action', () => {
       const originalAction = { type: 'something/FETCH_FAIL' }
       const expectedActions = [
         hideLoading(),
@@ -184,12 +197,12 @@ describe('loadingBarMiddleware', () => {
 
       const mockDispatch = (action) => {
         const expectedAction = expectedActions.shift()
-        expect(action).toEqual(expectedAction)
+        assert.deepStrictEqual(action, expectedAction)
         return action
       }
 
       mockStoreWithSuffixes(mockDispatch).dispatch(originalAction)
-      expect(expectedActions.length).toEqual(0)
+      assert.strictEqual(expectedActions.length, 0)
     })
 
     it('does not dispatch SHOW action on FOO_LOADED action', () => {
@@ -200,12 +213,12 @@ describe('loadingBarMiddleware', () => {
 
       const mockDispatch = (action) => {
         const expectedAction = expectedActions.shift()
-        expect(action).toEqual(expectedAction)
+        assert.deepStrictEqual(action, expectedAction)
         return action
       }
 
       mockStoreWithSuffixes(mockDispatch).dispatch(originalAction)
-      expect(expectedActions.length).toEqual(0)
+      assert.strictEqual(expectedActions.length, 0)
     })
   })
 
@@ -232,12 +245,12 @@ describe('loadingBarMiddleware', () => {
 
         const mockDispatch = (action) => {
           const expectedAction = expectedActions.shift()
-          expect(action).toEqual(expectedAction)
+          assert.deepStrictEqual(action, expectedAction)
           return action
         }
 
         mockStoreWithCustomScope(mockDispatch).dispatch(originalAction)
-        expect(expectedActions.length).toEqual(0)
+        assert.strictEqual(expectedActions.length, 0)
       })
     })
 
@@ -251,12 +264,12 @@ describe('loadingBarMiddleware', () => {
 
         const mockDispatch = (action) => {
           const expectedAction = expectedActions.shift()
-          expect(action).toEqual(expectedAction)
+          assert.deepStrictEqual(action, expectedAction)
           return action
         }
 
         mockStoreWithCustomScope(mockDispatch).dispatch(originalAction)
-        expect(expectedActions.length).toEqual(0)
+        assert.strictEqual(expectedActions.length, 0)
       })
     })
 
@@ -270,12 +283,12 @@ describe('loadingBarMiddleware', () => {
 
         const mockDispatch = (action) => {
           const expectedAction = expectedActions.shift()
-          expect(action).toEqual(expectedAction)
+          assert.deepStrictEqual(action, expectedAction)
           return action
         }
 
         mockStoreWithCustomScope(mockDispatch).dispatch(originalAction)
-        expect(expectedActions.length).toEqual(0)
+        assert.strictEqual(expectedActions.length, 0)
       })
     })
   })

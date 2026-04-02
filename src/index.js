@@ -1,5 +1,5 @@
-import LoadingBarContainer, { LoadingBar } from './loading_bar'
-import loadingBarMiddleware from './loading_bar_middleware'
+import ConnectedLoadingBar, { LoadingBar } from './loading_bar.js'
+import loadingBarMiddleware from './loading_bar_middleware.js'
 import {
   DEFAULT_SCOPE,
   HIDE,
@@ -9,8 +9,8 @@ import {
   resetLoading,
   SHOW,
   showLoading,
-} from './loading_bar_ducks'
-import ImmutableLoadingBar from './immutable'
+} from './loading_bar_ducks.js'
+import ImmutableLoadingBar from './immutable.js'
 
 export {
   DEFAULT_SCOPE,
@@ -25,4 +25,4 @@ export {
   SHOW,
   showLoading,
 }
-export default LoadingBarContainer
+export default ConnectedLoadingBar

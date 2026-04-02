@@ -1,10 +1,8 @@
-import { connect } from 'react-redux'
-import { LoadingBar } from './loading_bar'
+import { useSelector } from 'react-redux'
+import { LoadingBar } from './loading_bar.js'
+import { DEFAULT_SCOPE } from './loading_bar_ducks.js'
 
-import { DEFAULT_SCOPE } from './loading_bar_ducks'
-
-const mapImmutableStateToProps = (state, ownProps) => ({
-  loading: state.get('loadingBar')[ownProps.scope || DEFAULT_SCOPE],
-})
-
-export default connect(mapImmutableStateToProps)(LoadingBar)
+export default function ImmutableLoadingBar({ scope = DEFAULT_SCOPE, ...props }) {
+  const loading = useSelector((state) => state.get('loadingBar')[scope])
+  return <LoadingBar {...props} scope={scope} loading={loading || 0} />
+}

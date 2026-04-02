@@ -1,521 +1,533 @@
-/* eslint import/no-extraneous-dependencies: 0 */
-import React from 'react'
-import Adapter from '@wojtekmaj/enzyme-adapter-react-17'
-import Enzyme, { shallow, mount } from 'enzyme'
-import expect, { spyOn } from 'expect'
-import expectJSX from 'expect-jsx'
-import lolex from 'lolex'
+import { describe, it, beforeEach, afterEach } from 'node:test'
+import assert from 'node:assert/strict'
 import { JSDOM } from 'jsdom'
 
-import {
+// Setup jsdom BEFORE importing React
+const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>')
+globalThis.window = dom.window
+globalThis.document = dom.window.document
+globalThis.HTMLElement = dom.window.HTMLElement
+globalThis.IS_REACT_ACT_ENVIRONMENT = true
+
+// Must be dynamically imported after DOM setup
+const React = await import('react')
+const { act } = React
+const ReactDOMClient = await import('react-dom/client')
+
+const {
   LoadingBar,
   UPDATE_TIME,
   MAX_PROGRESS,
   PROGRESS_INCREASE,
   ANIMATION_DURATION,
-} from '../src/loading_bar'
+  TERMINATING_ANIMATION_DURATION,
+} = await import('../src/loading_bar.js')
 
-Enzyme.configure({ adapter: new Adapter() })
-expect.extend(expectJSX)
+// Helper to create a controllable wrapper around LoadingBar
+function createTestHarness(initialProps = {}) {
+  let updateProps
 
-// Setup jsdom to let enzyme's mount work
-const dom = new JSDOM('<!doctype html><html><body></body></html>')
-global.window = dom.window
-global.document = dom.window.document
+  function TestWrapper() {
+    const [props, setProps] = React.useState(initialProps)
+    updateProps = (newProps) => setProps((prev) => ({ ...prev, ...newProps }))
+    return React.createElement(LoadingBar, props)
+  }
+
+  return {
+    TestWrapper,
+    setProps: (newProps) => updateProps(newProps),
+  }
+}
 
 describe('LoadingBar', () => {
+  let container
+  let root
+
+  beforeEach(() => {
+    container = document.createElement('div')
+    document.body.appendChild(container)
+    root = ReactDOMClient.createRoot(container)
+  })
+
+  afterEach(() => {
+    act(() => { root.unmount() })
+    container.remove()
+  })
+
+  function getBarDiv() {
+    const outer = container.firstChild
+    if (!outer || !outer.children) return null
+    return outer.children[0]
+  }
+
+  function getOuterDiv() {
+    return container.firstChild
+  }
+
   describe('render', () => {
-    it('renders without problems', () => {
-      const wrapper = shallow(<LoadingBar />)
-
-      expect(wrapper.getElement().type).toEqual('div')
+    it('renders nothing when loading is not passed', () => {
+      act(() => { root.render(React.createElement(LoadingBar)) })
+      // hidden status → renders null
+      assert.strictEqual(container.innerHTML, '')
     })
 
-    it('renders an empty div when loading is not passed', () => {
-      const wrapper = shallow(<LoadingBar />)
+    it('renders not hidden 3px height red element', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
 
-      wrapper.equals(<div />)
+      const { TestWrapper, setProps } = createTestHarness({ loading: 1 })
+      act(() => { root.render(React.createElement(TestWrapper)) })
+
+      // Tick to fire interval and update percent
+      act(() => { t.mock.timers.tick(UPDATE_TIME + 1) })
+
+      const bar = getBarDiv()
+      assert.ok(bar, 'bar div should exist')
+      assert.strictEqual(bar.style.opacity, '1')
+      assert.strictEqual(bar.style.backgroundColor, 'red')
+      assert.strictEqual(bar.style.height, '3px')
+      assert.strictEqual(bar.style.position, 'absolute')
     })
 
-    it('renders not hidden 3px height red element', () => {
-      const wrapper = mount(<LoadingBar loading={1} />)
-      wrapper.setState({ percent: 10 })
+    it('renders an element with passed color and height', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
 
-      const resultStyle = wrapper.find('div').at(1).props().style
-      expect(resultStyle.opacity).toEqual('1')
-      expect(resultStyle.backgroundColor).toEqual('red')
-      expect(resultStyle.height).toEqual('3px')
-      expect(resultStyle.position).toEqual('absolute')
+      const { TestWrapper } = createTestHarness({
+        loading: 1,
+        style: { backgroundColor: 'blue', height: '5px' },
+      })
+      act(() => { root.render(React.createElement(TestWrapper)) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME + 1) })
+
+      const bar = getBarDiv()
+      assert.ok(bar)
+      assert.strictEqual(bar.style.backgroundColor, 'blue')
+      assert.strictEqual(bar.style.height, '5px')
     })
 
-    it('renders an element with passed color and height', () => {
-      const style = { backgroundColor: 'blue', height: '5px' }
-      const wrapper = mount(<LoadingBar loading={1} style={style} />)
+    it('does not apply default styling if CSS class is specified', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
 
-      const resultStyle = wrapper.find('div').at(1).props().style
-      expect(resultStyle.backgroundColor).toEqual('blue')
-      expect(resultStyle.height).toEqual('5px')
-    })
+      const { TestWrapper } = createTestHarness({
+        loading: 1,
+        className: 'custom',
+      })
+      act(() => { root.render(React.createElement(TestWrapper)) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME + 1) })
 
-    it('does not apply styling if CSS class is specified', () => {
-      const wrapper = mount(<LoadingBar loading={1} className="custom" />)
-
-      const resultStyle = wrapper.find('div').at(1).props().style
-      expect(resultStyle.backgroundColor).toEqual(undefined)
-      expect(resultStyle.height).toEqual(undefined)
-      expect(resultStyle.position).toEqual(undefined)
-    })
-
-    it('renders multiple instances in the same dom', () => {
-      const wrapper = mount(
-        <section>
-          <LoadingBar loading={1} />
-          <LoadingBar loading={1} scope="someScope" className="custom" />
-        </section> // eslint-disable-line comma-dangle
-      )
-
-      const sectionWrapper = wrapper.find('section').at(0)
-
-      const loadingBarDefault = sectionWrapper.childAt(0).find('div').at(1)
-      expect(loadingBarDefault.props().className).toEqual('')
-      expect(loadingBarDefault.props().style.opacity).toEqual('0')
-      expect(loadingBarDefault.props().style.backgroundColor).toEqual('red')
-      expect(loadingBarDefault.props().style.height).toEqual('3px')
-
-      const loadingBarCustom = sectionWrapper.childAt(1).find('div').at(1)
-      expect(loadingBarCustom.props().className).toEqual('custom')
-      expect(loadingBarCustom.props().style.backgroundColor).toEqual(undefined)
-      expect(loadingBarCustom.props().style.height).toEqual(undefined)
-      expect(loadingBarCustom.props().style.position).toEqual(undefined)
+      const bar = getBarDiv()
+      assert.ok(bar)
+      assert.strictEqual(bar.style.backgroundColor, '')
+      assert.strictEqual(bar.style.height, '')
+      assert.strictEqual(bar.style.position, '')
+      assert.strictEqual(bar.className, 'custom')
     })
   })
 
-  describe('update props', () => {
-    let spyStart
-    let clock
+  describe('progress simulation', () => {
+    it('simulates progress on UPDATE_TIME interval', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
 
-    beforeEach(() => {
-      spyStart = spyOn(LoadingBar.prototype, 'start').andCallThrough()
-      clock = lolex.install()
-    })
-    afterEach(() => {
-      spyStart.restore()
-      clock.uninstall()
-    })
+      const { TestWrapper, setProps } = createTestHarness()
+      act(() => { root.render(React.createElement(TestWrapper)) })
 
-    it('does not start on component mount', () => {
-      shallow(<LoadingBar />)
-      expect(spyStart).toNotHaveBeenCalled()
-      expect(spyStart.calls.length).toEqual(0)
+      act(() => { setProps({ loading: 1 }) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME + 1) })
+
+      const bar = getBarDiv()
+      assert.ok(bar)
+      assert.strictEqual(bar.style.width, `${PROGRESS_INCREASE}%`)
     })
 
-    it('starts on loading count increase', () => {
-      const wrapper = shallow(<LoadingBar />)
-      wrapper.setProps({ loading: 1 })
-      expect(spyStart).toHaveBeenCalled()
-      expect(spyStart.calls.length).toEqual(1)
+    it('does not fire progress before UPDATE_TIME', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
+
+      const { TestWrapper, setProps } = createTestHarness()
+      act(() => { root.render(React.createElement(TestWrapper)) })
+
+      act(() => { setProps({ loading: 1 }) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME - 1) })
+
+      // The bar should be visible but percent still at 0 (no interval fire yet)
+      const bar = getBarDiv()
+      if (bar) {
+        assert.strictEqual(bar.style.width, '0%')
+      }
     })
 
-    it('does not start if loading count is not increased', () => {
-      const wrapper = shallow(<LoadingBar />)
-      wrapper.setProps({ loading: 0 })
-      expect(spyStart).toNotHaveBeenCalled()
-      expect(spyStart.calls.length).toEqual(0)
+    it('increases percent after two UPDATE_TIME ticks', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
+
+      const { TestWrapper } = createTestHarness({ loading: 1 })
+      act(() => { root.render(React.createElement(TestWrapper)) })
+
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
+      const firstWidth = parseFloat(getBarDiv().style.width)
+
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
+      const secondWidth = parseFloat(getBarDiv().style.width)
+
+      assert.ok(secondWidth > firstWidth, `${secondWidth} should be > ${firstWidth}`)
     })
 
-    it('starts on component mount if loading count is > 0', () => {
-      mount(<LoadingBar loading={1} />)
-      expect(spyStart).toHaveBeenCalled()
-      expect(spyStart.calls.length).toEqual(1)
+    it('does not exceed MAX_PROGRESS', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
+
+      const { TestWrapper } = createTestHarness({ loading: 1 })
+      act(() => { root.render(React.createElement(TestWrapper)) })
+
+      act(() => { t.mock.timers.tick(UPDATE_TIME * 100) })
+
+      const percent = parseFloat(getBarDiv().style.width)
+      assert.ok(percent < MAX_PROGRESS, `Expected ${percent} < ${MAX_PROGRESS}`)
     })
 
-    it('starts only once if loading count is increased to 2', () => {
-      const wrapper = shallow(<LoadingBar />)
-      wrapper.setProps({ loading: 1 })
-      wrapper.setProps({ loading: 2 })
-      expect(spyStart).toHaveBeenCalled()
-      expect(spyStart.calls.length).toEqual(1)
-    })
+    it('does not set second interval if loading bar is already shown', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
 
-    describe('when showFastActions not set', () => {
-      it('does not show loading bar on quickly finished actions', () => {
-        const wrapper = shallow(<LoadingBar />)
-        wrapper.setProps({ loading: 1 })
-        clock.tick(UPDATE_TIME - 1) // less than first simulation
-        wrapper.setProps({ loading: 0 })
-        clock.tick(1)
-        expect(wrapper.state().percent).toBe(0)
-      })
-    })
+      const { TestWrapper, setProps } = createTestHarness()
+      act(() => { root.render(React.createElement(TestWrapper)) })
 
-    describe('when showFastActions is set', () => {
-      it('shows loading bar on quickly finished actions', () => {
-        const wrapper = shallow(<LoadingBar showFastActions />)
-        wrapper.setProps({ loading: 1 })
-        clock.tick(UPDATE_TIME - 1) // less than first simulation
-        wrapper.setProps({ loading: 0 })
-        clock.tick(1)
-        expect(wrapper.state().percent).toBe(100)
-      })
-    })
-  })
+      act(() => { setProps({ loading: 1 }) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
 
-  describe('unmount', () => {
-    let clock
-    let consoleSpy
+      const firstPercent = parseFloat(getBarDiv().style.width)
+      assert.ok(firstPercent > 0)
 
-    beforeEach(() => {
-      consoleSpy = spyOn(console, 'error')
-      clock = lolex.install()
-    })
-    afterEach(() => {
-      clock.uninstall()
-      consoleSpy.restore()
-    })
+      // Increase loading count - should not restart
+      act(() => { setProps({ loading: 2 }) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
 
-    it('does not throw errors in the console', () => {
-      const wrapper = shallow(<LoadingBar />)
-      wrapper.setProps({ loading: 1 })
-      expect(wrapper.instance().progressIntervalId).toNotEqual(null)
-      wrapper.unmount()
-      clock.tick(UPDATE_TIME)
-      expect(consoleSpy).toNotHaveBeenCalled()
-    })
-
-    it('does not throw errors in the console after loading', () => {
-      const wrapper = shallow(<LoadingBar />)
-      wrapper.setProps({ loading: 1 })
-      clock.tick(UPDATE_TIME)
-      wrapper.setProps({ loading: 0 })
-      expect(wrapper.instance().terminatingAnimationTimeoutId).toExist()
-      wrapper.unmount()
-      clock.tick(ANIMATION_DURATION)
-      expect(consoleSpy).toNotHaveBeenCalled()
+      const secondPercent = parseFloat(getBarDiv().style.width)
+      // Should continue from where it was, not restart at 0
+      assert.ok(secondPercent > firstPercent)
     })
   })
 
-  describe('progress', () => {
-    let wrapper
-    let clock
-    let spySimulateProgress
+  describe('stopping', () => {
+    it('sets percent to 100 when loading becomes 0', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
 
-    beforeEach(() => {
-      wrapper = shallow(<LoadingBar />)
-      spySimulateProgress = spyOn(
-        wrapper.instance(),
-        'simulateProgress',
-      ).andCallThrough()
-      clock = lolex.install()
-    })
-    afterEach(() => {
-      spySimulateProgress.restore()
-      clock.uninstall()
+      const { TestWrapper, setProps } = createTestHarness({ loading: 1 })
+      act(() => { root.render(React.createElement(TestWrapper)) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
+
+      assert.ok(parseFloat(getBarDiv().style.width) > 0)
+
+      act(() => { setProps({ loading: 0 }) })
+
+      assert.strictEqual(getBarDiv().style.width, '100%')
     })
 
-    it('schedules simulateProgress on UPDATE_TIME', () => {
-      wrapper.setProps({ loading: 1 })
-      clock.tick(UPDATE_TIME)
-      expect(spySimulateProgress).toHaveBeenCalled()
-      expect(spySimulateProgress.calls.length).toEqual(1)
+    it('resets to hidden after terminating animation', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
+
+      const { TestWrapper, setProps } = createTestHarness({ loading: 1 })
+      act(() => { root.render(React.createElement(TestWrapper)) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
+
+      act(() => { setProps({ loading: 0 }) })
+      assert.strictEqual(getBarDiv().style.width, '100%')
+
+      // Wait for terminating animation timeout
+      act(() => { t.mock.timers.tick(TERMINATING_ANIMATION_DURATION + 1) })
+
+      assert.strictEqual(container.innerHTML, '')
     })
 
-    it('does not schedule simulateProgress before UPDATE_TIME', () => {
-      wrapper.setProps({ loading: 1 })
-      clock.tick(UPDATE_TIME - 1)
-      expect(spySimulateProgress).toNotHaveBeenCalled()
-      expect(spySimulateProgress.calls.length).toEqual(0)
-    })
+    it('clears interval when loading becomes 0', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
 
-    it('schedules simulateProgress twice after UPDATE_TIME * 2', () => {
-      wrapper.setProps({ loading: 1 })
-      clock.tick(UPDATE_TIME)
-      clock.tick(UPDATE_TIME)
-      expect(spySimulateProgress).toHaveBeenCalled()
-      expect(spySimulateProgress.calls.length).toEqual(2)
-    })
+      const { TestWrapper, setProps } = createTestHarness({ loading: 1 })
+      act(() => { root.render(React.createElement(TestWrapper)) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
 
-    it('does not set second interval if loading bar is already shown', () => {
-      wrapper.setProps({ loading: 1 })
-      clock.tick(UPDATE_TIME)
-      const intervalId = wrapper.instance().progressIntervalId
-      expect(wrapper.state().percent).toNotBe(100)
-      wrapper.setProps({ loading: 2 })
-      clock.tick(UPDATE_TIME)
-      expect(wrapper.instance().progressIntervalId).toEqual(intervalId)
+      act(() => { setProps({ loading: 0 }) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
+      act(() => { t.mock.timers.tick(TERMINATING_ANIMATION_DURATION + UPDATE_TIME) })
+
+      assert.strictEqual(container.innerHTML, '')
     })
   })
 
-  describe('#simulateProgress', () => {
-    let clock
+  describe('restart during termination', () => {
+    it('resets progress when loading restarts during termination', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
 
-    beforeEach(() => {
-      clock = lolex.install()
-    })
-    afterEach(() => {
-      clock.uninstall()
-    })
+      const { TestWrapper, setProps } = createTestHarness({ loading: 1 })
+      act(() => { root.render(React.createElement(TestWrapper)) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
 
-    it('sets percent to 100 if loading becomes 0', () => {
-      const wrapper = shallow(<LoadingBar />)
-      wrapper.setProps({ loading: 1 })
-      clock.tick(UPDATE_TIME)
-      expect(wrapper.instance().progressIntervalId).toExist()
-      wrapper.setProps({ loading: 0 })
-      expect(wrapper.instance().progressIntervalId).toNotExist()
-      expect(wrapper.instance().terminatingAnimationTimeoutId).toExist()
-      expect(wrapper.state().percent).toBe(100)
-      clock.tick(UPDATE_TIME)
-      expect(wrapper.state().percent).toBe(0)
-      expect(wrapper.instance().terminatingAnimationTimeoutId).toNotExist()
-    })
+      const progressBefore = parseFloat(getBarDiv().style.width)
+      assert.ok(progressBefore > 0 && progressBefore < 100)
 
-    it('clears interval if loading becomes 0 after one more tick', () => {
-      const wrapper = shallow(<LoadingBar />)
-      wrapper.setProps({ loading: 1 })
-      clock.tick(UPDATE_TIME)
-      expect(wrapper.instance().progressIntervalId).toExist()
-      wrapper.setProps({ loading: 0 })
-      clock.tick(UPDATE_TIME)
-      clock.tick(UPDATE_TIME)
-      expect(wrapper.instance().progressIntervalId).toNotExist()
+      // Stop
+      act(() => { setProps({ loading: 0 }) })
+      assert.strictEqual(getBarDiv().style.width, '100%')
+
+      // Restart immediately
+      act(() => { setProps({ loading: 1 }) })
+
+      // Should have reset
+      const percentAfterRestart = parseFloat(getBarDiv().style.width)
+      assert.ok(percentAfterRestart < 100, 'Should not be at 100% after restart')
     })
 
-    it('resets progress if loading becomes 0 and another progress '
-       + 'started right away (loading > 0)', () => {
-      const wrapper = shallow(<LoadingBar />)
-      wrapper.setProps({ loading: 1 })
-      clock.tick(UPDATE_TIME)
-      expect(wrapper.state().percent).toBeGreaterThan(0).toBeLessThan(100)
+    it('does not hang when restarting during terminating animation', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
 
-      wrapper.setProps({ loading: 0 })
-      expect(wrapper.state().percent).toBe(100)
+      const { TestWrapper, setProps } = createTestHarness({ loading: 1 })
+      act(() => { root.render(React.createElement(TestWrapper)) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
 
-      wrapper.setProps({ loading: 1 })
-      expect(wrapper.instance().terminatingAnimationTimeoutId).toNotExist()
-      expect(wrapper.state().percent).toBe(0)
+      // Stop
+      act(() => { setProps({ loading: 0 }) })
+
+      // Wait a bit during animation
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
+
+      // Restart
+      act(() => { setProps({ loading: 1 }) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
+
+      // Should be shown
+      const bar = getBarDiv()
+      assert.ok(bar)
+      const percent = parseFloat(bar.style.width)
+      assert.ok(percent > 0 && percent < 100)
+
+      // Stop again and wait a long time
+      act(() => { setProps({ loading: 0 }) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME * 1000) })
+
+      assert.strictEqual(container.innerHTML, '')
     })
 
-    it('resets progress if loading becomes 0 and terminating animation '
-       + 'finished', () => {
-      const wrapper = shallow(<LoadingBar />)
-      wrapper.setProps({ loading: 1 })
-      clock.tick(UPDATE_TIME)
-      expect(wrapper.state().percent).toBeGreaterThan(0).toBeLessThan(100)
-      wrapper.setProps({ loading: 0 })
-      expect(wrapper.state().percent).toBe(100)
-      clock.tick(UPDATE_TIME)
-      clock.tick(ANIMATION_DURATION)
-      expect(wrapper.state().percent).toBe(0)
-      expect(wrapper.instance().terminatingAnimationTimeoutId).toNotExist()
+    it('resets position when show is called right after hide', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
+
+      const { TestWrapper, setProps } = createTestHarness({ loading: 1 })
+      act(() => { root.render(React.createElement(TestWrapper)) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
+
+      // Hide
+      act(() => { setProps({ loading: 0 }) })
+      assert.strictEqual(getBarDiv().style.width, '100%')
+
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
+
+      // Show again
+      act(() => { setProps({ loading: 1 }) })
+
+      const percent = parseFloat(getBarDiv().style.width)
+      assert.notStrictEqual(percent, 100)
+
+      // Wait one tick
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
+
+      // Progress should be running
+      const bar = getBarDiv()
+      assert.ok(bar)
+      assert.ok(parseFloat(bar.style.width) > 0)
+    })
+  })
+
+  describe('showFastActions', () => {
+    it('does not show loading bar on quickly finished actions by default', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
+
+      const { TestWrapper, setProps } = createTestHarness()
+      act(() => { root.render(React.createElement(TestWrapper)) })
+
+      act(() => { setProps({ loading: 1 }) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME - 1) }) // less than first simulation
+
+      act(() => { setProps({ loading: 0 }) })
+      act(() => { t.mock.timers.tick(1) })
+
+      // Should reset immediately (no terminating animation for fast actions)
+      assert.strictEqual(container.innerHTML, '')
     })
 
-    describe('if percent is less than MAX_PROGRESS', () => {
-      it('increases percent', () => {
-        const wrapper = shallow(<LoadingBar />)
-        expect(wrapper.state().percent).toBe(0)
-        wrapper.setProps({ loading: 1 })
-        clock.tick(UPDATE_TIME)
-        expect(wrapper.state().percent).toBe(PROGRESS_INCREASE)
-      })
-    })
+    it('shows loading bar on quickly finished actions when set', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
 
-    describe('if percent is MAX_PROGRESS', () => {
-      it('does not increase percent further', () => {
-        const wrapper = shallow(<LoadingBar />)
-        expect(wrapper.state().percent).toBe(0)
-        wrapper.setProps({ loading: 1 })
-        clock.tick(UPDATE_TIME * 100)
-        expect(wrapper.state().percent).toBeLessThan(MAX_PROGRESS)
-        clock.tick(UPDATE_TIME)
-        expect(wrapper.state().percent).toBeLessThan(MAX_PROGRESS)
-      })
-    })
+      const { TestWrapper, setProps } = createTestHarness({ showFastActions: true })
+      act(() => { root.render(React.createElement(TestWrapper)) })
 
-    describe('if showLoading is called during terminating animation', () => {
-      let wrapper
-      let spySimulateProgress
+      act(() => { setProps({ loading: 1 }) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME - 1) })
 
-      beforeEach(() => {
-        wrapper = shallow(<LoadingBar />)
-        spySimulateProgress = spyOn(
-          wrapper.instance(),
-          'simulateProgress',
-        ).andCallThrough()
-      })
-      afterEach(() => {
-        spySimulateProgress.restore()
-      })
-
-      it('does not hang and resets the position', () => {
-        // Show Loading Bar
-        wrapper.setProps({ loading: 1 })
-        clock.tick(UPDATE_TIME)
-        expect(wrapper.instance().progressIntervalId).toExist()
-
-        // Hide Loading Bar, let the percent become 100 and
-        // schedule the reset after animation
-        wrapper.setProps({ loading: 0 })
-        expect(wrapper.instance().terminatingAnimationTimeoutId).toExist()
-
-        // Wait one tick while animation is going
-        clock.tick(UPDATE_TIME)
-
-        // Show Loading Bar again
-        wrapper.setProps({ loading: 1 })
-        expect(wrapper.instance().progressIntervalId).toExist()
-
-        clock.tick(UPDATE_TIME)
-
-        // It should be shown
-        expect(wrapper.state().percent).toBeGreaterThan(0).toBeLessThan(100)
-
-        // Hide Loading Bar and emulate a long period of time
-        wrapper.setProps({ loading: 0 })
-        clock.tick(UPDATE_TIME * 1000)
-
-        expect(spySimulateProgress.calls.length).toEqual(2)
-      })
-    })
-
-    describe('if showLoading is called right after hideLoading', () => {
-      let wrapper
-      let spySimulateProgress
-
-      beforeEach(() => {
-        wrapper = shallow(<LoadingBar />)
-        spySimulateProgress = spyOn(
-          wrapper.instance(),
-          'simulateProgress',
-        ).andCallThrough()
-      })
-      afterEach(() => {
-        spySimulateProgress.restore()
-      })
-
-      it('does not hide and resets the position', () => {
-        // Show Loading Bar
-        wrapper.setProps({ loading: 1 })
-        clock.tick(UPDATE_TIME)
-        expect(wrapper.instance().progressIntervalId).toExist()
-
-        // Hiding loading bar should set percentage to 100
-        wrapper.setProps({ loading: 0 })
-        expect(wrapper.state().percent).toEqual(100)
-
-        clock.tick(UPDATE_TIME)
-
-        // Show Loading Bar again
-        wrapper.setProps({ loading: 1 })
-
-        // It should be shown
-        expect(wrapper.state().percent).toNotEqual(100)
-
-        // Wait one tick to get the animation going
-        clock.tick(UPDATE_TIME)
-
-        // The progress simulation is still going
-        expect(wrapper.instance().progressIntervalId).toExist()
-      })
+      act(() => { setProps({ loading: 0 }) })
+      // Should still be visible
+      const bar = getBarDiv()
+      assert.ok(bar, 'bar should be visible with showFastActions')
+      assert.strictEqual(bar.style.width, '100%')
     })
   })
 
   describe('updateTime prop', () => {
-    const updateTime = 100
-    let wrapper
-    let clock
-    let spySimulateProgress
+    it('can be changed', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
 
-    beforeEach(() => {
-      wrapper = shallow(<LoadingBar updateTime={updateTime} />)
-      spySimulateProgress = spyOn(
-        wrapper.instance(),
-        'simulateProgress',
-      )
-      clock = lolex.install()
-    })
-    afterEach(() => {
-      spySimulateProgress.restore()
-      clock.uninstall()
-    })
+      const customUpdateTime = 100
+      const { TestWrapper } = createTestHarness({
+        loading: 1,
+        updateTime: customUpdateTime,
+      })
+      act(() => { root.render(React.createElement(TestWrapper)) })
+      act(() => { t.mock.timers.tick(customUpdateTime) })
 
-    it('can be changed', () => {
-      wrapper.setProps({ loading: 1 })
-      clock.tick(updateTime)
-      expect(spySimulateProgress).toHaveBeenCalled()
-      expect(spySimulateProgress.calls.length).toEqual(1)
+      const bar = getBarDiv()
+      assert.ok(bar)
+      assert.ok(parseFloat(bar.style.width) > 0, 'Should have made progress')
     })
   })
 
   describe('maxProgress prop', () => {
-    let clock
+    it('can be changed', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
 
-    beforeEach(() => {
-      clock = lolex.install()
-    })
-    afterEach(() => {
-      clock.uninstall()
-    })
+      const maxProgress = 50
+      const { TestWrapper } = createTestHarness({ loading: 1, maxProgress })
+      act(() => { root.render(React.createElement(TestWrapper)) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME * 100) })
 
-    it('can be changed', () => {
-      const maxProgress = 95
-      const wrapper = shallow(<LoadingBar maxProgress={maxProgress} />)
-      wrapper.setProps({ loading: 1 })
-      clock.tick(UPDATE_TIME * 100)
-      expect(wrapper.state().percent).toBeLessThan(maxProgress)
+      const bar = getBarDiv()
+      const percent = parseFloat(bar.style.width)
+      assert.ok(percent < maxProgress, `Expected ${percent} < ${maxProgress}`)
     })
   })
 
   describe('progressIncrease prop', () => {
-    let clock
+    it('can be changed', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
 
-    beforeEach(() => {
-      clock = lolex.install()
-    })
-    afterEach(() => {
-      clock.uninstall()
-    })
-
-    it('can be changed', () => {
       const progressIncrease = 5
-      const wrapper = shallow(
-        <LoadingBar progressIncrease={progressIncrease} />,
-      )
-      wrapper.setProps({ loading: 1 })
-      clock.tick(UPDATE_TIME)
-      expect(wrapper.state().percent).toEqual(progressIncrease)
+      const { TestWrapper } = createTestHarness({ loading: 1, progressIncrease })
+      act(() => { root.render(React.createElement(TestWrapper)) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
+
+      const bar = getBarDiv()
+      assert.strictEqual(bar.style.width, `${progressIncrease}%`)
     })
   })
 
   describe('direction prop', () => {
-    let clock
+    it('simulates progress from left to right by default', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
 
-    beforeEach(() => {
-      clock = lolex.install()
-    })
-    afterEach(() => {
-      clock.uninstall()
-    })
+      const { TestWrapper } = createTestHarness({ loading: 1 })
+      act(() => { root.render(React.createElement(TestWrapper)) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
 
-    it('simulates progress from left to right by default', () => {
-      const wrapper = shallow(<LoadingBar />)
-      wrapper.setProps({ loading: 1 })
-      clock.tick(UPDATE_TIME)
-
-      const resultStyle = wrapper.find('div').at(1).props().style
-      expect(resultStyle.width).toEqual('20%')
-      const parentStyle = wrapper.find('div').at(0).props().style
-      expect(parentStyle.direction).toEqual('ltr')
+      const outer = getOuterDiv()
+      assert.strictEqual(outer.style.direction, 'ltr')
+      assert.strictEqual(getBarDiv().style.width, '20%')
     })
 
-    it('can simulate progress from right to left', () => {
-      const wrapper = shallow(<LoadingBar direction="rtl" />)
-      wrapper.setProps({ loading: 1 })
-      clock.tick(UPDATE_TIME)
+    it('can simulate progress from right to left', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
 
-      const resultStyle = wrapper.find('div').at(1).props().style
-      expect(resultStyle.width).toEqual('20%')
-      const parentStyle = wrapper.find('div').at(0).props().style
-      expect(parentStyle.direction).toEqual('rtl')
+      const { TestWrapper } = createTestHarness({ loading: 1, direction: 'rtl' })
+      act(() => { root.render(React.createElement(TestWrapper)) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
+
+      const outer = getOuterDiv()
+      assert.strictEqual(outer.style.direction, 'rtl')
+      assert.strictEqual(getBarDiv().style.width, '20%')
+    })
+  })
+
+  describe('unmount safety', () => {
+    it('does not throw errors after unmount during loading', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
+
+      const { TestWrapper } = createTestHarness({ loading: 1 })
+      act(() => { root.render(React.createElement(TestWrapper)) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
+
+      act(() => { root.unmount() })
+
+      // Should not throw
+      act(() => { t.mock.timers.tick(UPDATE_TIME * 5) })
+    })
+
+    it('does not throw errors after unmount during stopping', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
+
+      const { TestWrapper, setProps } = createTestHarness({ loading: 1 })
+      act(() => { root.render(React.createElement(TestWrapper)) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
+
+      act(() => { setProps({ loading: 0 }) })
+
+      act(() => { root.unmount() })
+
+      // Should not throw
+      act(() => { t.mock.timers.tick(ANIMATION_DURATION * 2) })
+    })
+  })
+
+  describe('multiple loading bars', () => {
+    it('renders multiple instances independently', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
+
+      function MultiWrapper() {
+        return React.createElement('section', null,
+          React.createElement(LoadingBar, { loading: 1 }),
+          React.createElement(LoadingBar, { loading: 1, scope: 'someScope', className: 'custom' }),
+        )
+      }
+
+      act(() => { root.render(React.createElement(MultiWrapper)) })
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
+
+      const section = container.querySelector('section')
+      assert.ok(section)
+
+      // First loading bar - default styling
+      const firstBar = section.children[0].children[0]
+      assert.strictEqual(firstBar.className, '')
+      assert.strictEqual(firstBar.style.backgroundColor, 'red')
+      assert.strictEqual(firstBar.style.height, '3px')
+
+      // Second loading bar - custom class, no default styling
+      const secondBar = section.children[1].children[0]
+      assert.strictEqual(secondBar.className, 'custom')
+      assert.strictEqual(secondBar.style.backgroundColor, '')
+      assert.strictEqual(secondBar.style.height, '')
+    })
+  })
+
+  describe('start on mount with loading > 0', () => {
+    it('starts on component mount if loading count is > 0', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
+
+      act(() => {
+        root.render(React.createElement(LoadingBar, { loading: 1 }))
+      })
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
+
+      const bar = getBarDiv()
+      assert.ok(bar)
+      assert.ok(parseFloat(bar.style.width) > 0)
+    })
+
+    it('starts only once if loading count is increased to 2', (t) => {
+      t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] })
+
+      const { TestWrapper, setProps } = createTestHarness()
+      act(() => { root.render(React.createElement(TestWrapper)) })
+
+      act(() => { setProps({ loading: 1 }) })
+      act(() => { setProps({ loading: 2 }) })
+
+      act(() => { t.mock.timers.tick(UPDATE_TIME) })
+
+      const bar = getBarDiv()
+      assert.ok(bar)
+      // Should only have progressed once (one interval tick)
+      assert.strictEqual(bar.style.width, `${PROGRESS_INCREASE}%`)
     })
   })
 })

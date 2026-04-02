@@ -7,32 +7,26 @@ export const DEFAULT_SCOPE = 'default'
 export function showLoading(scope = DEFAULT_SCOPE) {
   return {
     type: SHOW,
-    payload: {
-      scope,
-    },
+    payload: { scope },
   }
 }
 
 export function hideLoading(scope = DEFAULT_SCOPE) {
   return {
     type: HIDE,
-    payload: {
-      scope,
-    },
+    payload: { scope },
   }
 }
 
 export function resetLoading(scope = DEFAULT_SCOPE) {
   return {
     type: RESET,
-    payload: {
-      scope,
-    },
+    payload: { scope },
   }
 }
 
 export function loadingBarReducer(state = {}, action = {}) {
-  const { scope = DEFAULT_SCOPE } = (action.payload || {})
+  const { scope = DEFAULT_SCOPE } = action.payload || {}
 
   switch (action.type) {
     case SHOW:

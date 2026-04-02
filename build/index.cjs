@@ -1,6 +1,42 @@
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+// src/index.js
+var index_exports = {};
+__export(index_exports, {
+  DEFAULT_SCOPE: () => DEFAULT_SCOPE,
+  HIDE: () => HIDE,
+  ImmutableLoadingBar: () => ImmutableLoadingBar,
+  LoadingBar: () => LoadingBar,
+  RESET: () => RESET,
+  SHOW: () => SHOW,
+  default: () => index_default,
+  hideLoading: () => hideLoading,
+  loadingBarMiddleware: () => loadingBarMiddleware,
+  loadingBarReducer: () => loadingBarReducer,
+  resetLoading: () => resetLoading,
+  showLoading: () => showLoading
+});
+module.exports = __toCommonJS(index_exports);
+
 // src/loading_bar.js
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useSelector } from "react-redux";
+var import_react = require("react");
+var import_react_redux = require("react-redux");
 
 // src/loading_bar_ducks.js
 var SHOW = "loading-bar/SHOW";
@@ -49,7 +85,7 @@ function loadingBarReducer(state = {}, action = {}) {
 }
 
 // src/loading_bar.js
-import { jsx, jsxs } from "react/jsx-runtime";
+var import_jsx_runtime = require("react/jsx-runtime");
 var UPDATE_TIME = 400;
 var MAX_PROGRESS = 99;
 var PROGRESS_INCREASE = 20;
@@ -70,21 +106,21 @@ function LoadingBar({
   style: customStyle = {},
   updateTime = UPDATE_TIME
 }) {
-  const [percent, setPercent] = useState(0);
-  const [status, setStatus] = useState("hidden");
-  const progressIntervalId = useRef(null);
-  const terminatingAnimationTimeoutId = useRef(null);
-  const prevLoadingRef = useRef(loading);
-  const statusRef = useRef(status);
-  const percentRef = useRef(percent);
+  const [percent, setPercent] = (0, import_react.useState)(0);
+  const [status, setStatus] = (0, import_react.useState)("hidden");
+  const progressIntervalId = (0, import_react.useRef)(null);
+  const terminatingAnimationTimeoutId = (0, import_react.useRef)(null);
+  const prevLoadingRef = (0, import_react.useRef)(loading);
+  const statusRef = (0, import_react.useRef)(status);
+  const percentRef = (0, import_react.useRef)(percent);
   statusRef.current = status;
   percentRef.current = percent;
-  const reset = useCallback(() => {
+  const reset = (0, import_react.useCallback)(() => {
     terminatingAnimationTimeoutId.current = null;
     setPercent(0);
     setStatus("hidden");
   }, []);
-  const stop = useCallback(() => {
+  const stop = (0, import_react.useCallback)(() => {
     clearInterval(progressIntervalId.current);
     progressIntervalId.current = null;
     const currentPercent = percentRef.current;
@@ -97,7 +133,7 @@ function LoadingBar({
     setPercent(100);
     setStatus("stopping");
   }, [showFastActions, reset]);
-  const start = useCallback(() => {
+  const start = (0, import_react.useCallback)(() => {
     if (terminatingAnimationTimeoutId.current) {
       clearTimeout(terminatingAnimationTimeoutId.current);
       terminatingAnimationTimeoutId.current = null;
@@ -112,7 +148,7 @@ function LoadingBar({
     }, updateTime);
     setStatus("running");
   }, [updateTime, progressIncrease, maxProgress]);
-  useEffect(() => {
+  (0, import_react.useEffect)(() => {
     const prevLoading = prevLoadingRef.current;
     prevLoadingRef.current = loading;
     const currentStatus = statusRef.current;
@@ -128,7 +164,7 @@ function LoadingBar({
       stop();
     }
   }, [loading, start, stop]);
-  useEffect(() => {
+  (0, import_react.useEffect)(() => {
     return () => {
       clearInterval(progressIntervalId.current);
       clearTimeout(terminatingAnimationTimeoutId.current);
@@ -150,14 +186,14 @@ function LoadingBar({
   }
   barStyle.opacity = percent > 0 && percent <= 100 ? "1" : "0";
   const finalStyle = { ...barStyle, ...customStyle };
-  return /* @__PURE__ */ jsxs("div", { style: { direction }, children: [
-    /* @__PURE__ */ jsx("div", { style: finalStyle, className }),
-    /* @__PURE__ */ jsx("div", { style: { display: "table", clear: "both" } })
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { style: { direction }, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: finalStyle, className }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { style: { display: "table", clear: "both" } })
   ] });
 }
 function ConnectedLoadingBar({ scope = DEFAULT_SCOPE, ...props }) {
-  const loading = useSelector((state) => state.loadingBar[scope]);
-  return /* @__PURE__ */ jsx(LoadingBar, { ...props, scope, loading: loading || 0 });
+  const loading = (0, import_react_redux.useSelector)((state) => state.loadingBar[scope]);
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoadingBar, { ...props, scope, loading: loading || 0 });
 }
 var loading_bar_default = ConnectedLoadingBar;
 
@@ -184,26 +220,12 @@ function loadingBarMiddleware(config = {}) {
 }
 
 // src/immutable.js
-import { useSelector as useSelector2 } from "react-redux";
-import { jsx as jsx2 } from "react/jsx-runtime";
+var import_react_redux2 = require("react-redux");
+var import_jsx_runtime2 = require("react/jsx-runtime");
 function ImmutableLoadingBar({ scope = DEFAULT_SCOPE, ...props }) {
-  const loading = useSelector2((state) => state.get("loadingBar")[scope]);
-  return /* @__PURE__ */ jsx2(LoadingBar, { ...props, scope, loading: loading || 0 });
+  const loading = (0, import_react_redux2.useSelector)((state) => state.get("loadingBar")[scope]);
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(LoadingBar, { ...props, scope, loading: loading || 0 });
 }
 
 // src/index.js
 var index_default = loading_bar_default;
-export {
-  DEFAULT_SCOPE,
-  HIDE,
-  ImmutableLoadingBar,
-  LoadingBar,
-  RESET,
-  SHOW,
-  index_default as default,
-  hideLoading,
-  loadingBarMiddleware,
-  loadingBarReducer,
-  resetLoading,
-  showLoading
-};

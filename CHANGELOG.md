@@ -1,5 +1,19 @@
 # Release History
 
+## 6.0.0
+  - **BREAKING**: Modernized entire codebase for 2026 standards
+  - Converted React class component to functional component with hooks (useState, useEffect, useRef, useCallback)
+  - Removed all runtime dependencies (prop-types, react-lifecycles-compat) — zero dependencies
+  - Migrated to ESM (ECMAScript Modules) with `"type": "module"` in package.json
+  - Dual ESM/CJS build output via esbuild
+  - Updated peer dependencies: React 18+/19, Redux 5, react-redux 9
+  - Replaced vendor-prefixed CSS transitions (ms, webkit, moz, o) with standard `transition` property
+  - Replaced Babel build pipeline with esbuild
+  - Replaced mocha/enzyme/lolex/expect test stack with Node.js native test runner (node:test)
+  - Updated TypeScript definitions to use FunctionComponent instead of Component class
+  - Removed .babelrc, .eslintrc, and legacy Babel plugin configurations
+  - Removed ImmutableLoadingBar class component, replaced with functional component using useSelector
+
 ## 5.0.8
   - Update types definition (thanks @MasterOdin)
 
