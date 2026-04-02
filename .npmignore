@@ -1,3 +1,7 @@
 src
-coverage
 spec
+coverage
+jsx-loader.js
+jsx-hooks.js
+esbuild.config.js
+.github

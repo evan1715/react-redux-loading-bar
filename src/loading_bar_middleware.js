@@ -1,4 +1,4 @@
-import { DEFAULT_SCOPE, showLoading, hideLoading } from './loading_bar_ducks'
+import { DEFAULT_SCOPE, showLoading, hideLoading } from './loading_bar_ducks.js'
 
 const defaultTypeSuffixes = ['PENDING', 'FULFILLED', 'REJECTED']
 
