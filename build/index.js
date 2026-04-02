@@ -1,5 +1,5 @@
 // src/loading_bar.js
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 
 // src/loading_bar_ducks.js
@@ -90,10 +90,7 @@ function LoadingBar({
     const currentPercent = percentRef.current;
     const isShown = currentPercent > 0 && currentPercent <= 100;
     const terminatingDuration = isShown || showFastActions ? TERMINATING_ANIMATION_DURATION : 0;
-    terminatingAnimationTimeoutId.current = setTimeout(
-      reset,
-      terminatingDuration
-    );
+    terminatingAnimationTimeoutId.current = setTimeout(reset, terminatingDuration);
     setPercent(100);
     setStatus("stopping");
   }, [showFastActions, reset]);
