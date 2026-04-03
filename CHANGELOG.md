@@ -1,5 +1,14 @@
 # Release History
 
+## 6.1.0
+  - Converted entire codebase from JavaScript to TypeScript (strict mode)
+  - Types are now built-in (removed separate `index.d.ts` in favor of generated `.d.ts` from source)
+  - Added TypeScript 6 with strict configuration
+  - Exported all types: `LoadingBarProps`, `LoadingBarContainerProps`, `LoadingBarState`, `LoadingBarAction`, `MiddlewareConfig`
+  - Updated esbuild config and Node.js loader hooks to support `.ts`/`.tsx` files
+  - Added `typecheck` script and CI step for `tsc` validation
+  - Tests converted to TypeScript with full type annotations
+
 ## 6.0.0
   - **BREAKING**: Modernized entire codebase for 2026 standards
   - Converted React class component to functional component with hooks (useState, useEffect, useRef, useCallback)

@@ -177,10 +177,30 @@ If your top-level Redux store is immutable:
 import { ImmutableLoadingBar as LoadingBar } from 'react-redux-loading-bar';
 ```
 
+## TypeScript
+
+This package is written in TypeScript and ships with built-in type declarations. All types are exported:
+
+```ts
+import type {
+    LoadingBarProps,
+    LoadingBarContainerProps,
+    LoadingBarState,
+    LoadingBarAction,
+    MiddlewareConfig,
+} from 'react-redux-loading-bar';
+```
+
 ## Tests
 
 ```bash
 npm test
+```
+
+### Type Checking
+
+```bash
+npm run typecheck
 ```
 
 ## Changelog

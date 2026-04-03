@@ -10,7 +10,7 @@ import {
     loadingBarReducer,
     resetLoading,
     showLoading,
-} from '../src/loading_bar_ducks.js';
+} from '../src/loading_bar_ducks.ts';
 
 describe('loadingBarReducer', () => {
     it('returns the initial state', () => {

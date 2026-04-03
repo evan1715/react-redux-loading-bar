@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
+import type { ReactElement } from 'react';
 import React from 'react';
 import ReactDOMClient from 'react-dom/client';
 import { JSDOM } from 'jsdom';
@@ -12,36 +13,42 @@ import {
     PROGRESS_INCREASE,
     TERMINATING_ANIMATION_DURATION,
     UPDATE_TIME,
-} from '../src/loading_bar.js';
+} from '../src/loading_bar.tsx';
+import type { LoadingBarProps } from '../src/loading_bar.tsx';
 
 // Setup jsdom BEFORE importing React
 const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>');
-globalThis.window = dom.window;
+globalThis.window = dom.window as unknown as Window & typeof globalThis;
 globalThis.document = dom.window.document;
 globalThis.HTMLElement = dom.window.HTMLElement;
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 
+declare global {
+    // eslint-disable-next-line no-var
+    var IS_REACT_ACT_ENVIRONMENT: boolean;
+}
+
 const { act } = React;
 
 // Helper to create a controllable wrapper around LoadingBar
-function createTestHarness(initialProps = {}) {
-    let updateProps;
+function createTestHarness(initialProps: LoadingBarProps = {}) {
+    let updateProps: (newProps: Partial<LoadingBarProps>) => void;
 
-    function TestWrapper() {
-        const [props, setProps] = React.useState(initialProps);
-        updateProps = (newProps) => setProps((prev) => ({ ...prev, ...newProps }));
+    function TestWrapper(): ReactElement {
+        const [props, setProps] = React.useState<LoadingBarProps>(initialProps);
+        updateProps = (newProps: Partial<LoadingBarProps>) => setProps((prev) => ({ ...prev, ...newProps }));
         return React.createElement(LoadingBar, props);
     }
 
     return {
         TestWrapper,
-        setProps: (newProps) => updateProps(newProps),
+        setProps: (newProps: Partial<LoadingBarProps>) => updateProps(newProps),
     };
 }
 
 describe('LoadingBar', () => {
-    let container;
-    let root;
+    let container: HTMLDivElement;
+    let root: ReactDOMClient.Root;
 
     beforeEach(() => {
         container = document.createElement('div');
@@ -56,14 +63,14 @@ describe('LoadingBar', () => {
         container.remove();
     });
 
-    function getBarDiv() {
-        const outer = container.firstChild;
-        if (!outer || !outer.children) return null;
-        return outer.children[0];
+    function getBarDiv(): HTMLElement | null {
+        const outer = container.firstChild as HTMLElement | null;
+        if (!outer?.children) return null;
+        return outer.children[0] as HTMLElement;
     }
 
-    function getOuterDiv() {
-        return container.firstChild;
+    function getOuterDiv(): HTMLElement | null {
+        return container.firstChild as HTMLElement | null;
     }
 
     describe('render', () => {
@@ -187,12 +194,12 @@ describe('LoadingBar', () => {
             act(() => {
                 t.mock.timers.tick(UPDATE_TIME);
             });
-            const firstWidth = parseFloat(getBarDiv().style.width);
+            const firstWidth = parseFloat(getBarDiv()!.style.width);
 
             act(() => {
                 t.mock.timers.tick(UPDATE_TIME);
             });
-            const secondWidth = parseFloat(getBarDiv().style.width);
+            const secondWidth = parseFloat(getBarDiv()!.style.width);
 
             assert.ok(secondWidth > firstWidth, `${secondWidth} should be > ${firstWidth}`);
         });
@@ -208,7 +215,7 @@ describe('LoadingBar', () => {
                 t.mock.timers.tick(UPDATE_TIME * 100);
             });
 
-            const percent = parseFloat(getBarDiv().style.width);
+            const percent = parseFloat(getBarDiv()!.style.width);
             assert.ok(percent < MAX_PROGRESS, `Expected ${percent} < ${MAX_PROGRESS}`);
         });
 
@@ -226,7 +233,7 @@ describe('LoadingBar', () => {
                 t.mock.timers.tick(UPDATE_TIME);
             });
 
-            const firstPercent = parseFloat(getBarDiv().style.width);
+            const firstPercent = parseFloat(getBarDiv()!.style.width);
             assert.ok(firstPercent > 0);
 
             // Increase loading count - should not restart
@@ -237,7 +244,7 @@ describe('LoadingBar', () => {
                 t.mock.timers.tick(UPDATE_TIME);
             });
 
-            const secondPercent = parseFloat(getBarDiv().style.width);
+            const secondPercent = parseFloat(getBarDiv()!.style.width);
             assert.ok(secondPercent > firstPercent);
         });
     });
@@ -254,13 +261,13 @@ describe('LoadingBar', () => {
                 t.mock.timers.tick(UPDATE_TIME);
             });
 
-            assert.ok(parseFloat(getBarDiv().style.width) > 0);
+            assert.ok(parseFloat(getBarDiv()!.style.width) > 0);
 
             act(() => {
                 setProps({ loading: 0 });
             });
 
-            assert.strictEqual(getBarDiv().style.width, '100%');
+            assert.strictEqual(getBarDiv()!.style.width, '100%');
         });
 
         it('resets to hidden after terminating animation', (t) => {
@@ -277,7 +284,7 @@ describe('LoadingBar', () => {
             act(() => {
                 setProps({ loading: 0 });
             });
-            assert.strictEqual(getBarDiv().style.width, '100%');
+            assert.strictEqual(getBarDiv()!.style.width, '100%');
 
             act(() => {
                 t.mock.timers.tick(TERMINATING_ANIMATION_DURATION + 1);
@@ -323,19 +330,19 @@ describe('LoadingBar', () => {
                 t.mock.timers.tick(UPDATE_TIME);
             });
 
-            const progressBefore = parseFloat(getBarDiv().style.width);
+            const progressBefore = parseFloat(getBarDiv()!.style.width);
             assert.ok(progressBefore > 0 && progressBefore < 100);
 
             act(() => {
                 setProps({ loading: 0 });
             });
-            assert.strictEqual(getBarDiv().style.width, '100%');
+            assert.strictEqual(getBarDiv()!.style.width, '100%');
 
             act(() => {
                 setProps({ loading: 1 });
             });
 
-            const percentAfterRestart = parseFloat(getBarDiv().style.width);
+            const percentAfterRestart = parseFloat(getBarDiv()!.style.width);
             assert.ok(percentAfterRestart < 100, 'Should not be at 100% after restart');
         });
 
@@ -393,7 +400,7 @@ describe('LoadingBar', () => {
             act(() => {
                 setProps({ loading: 0 });
             });
-            assert.strictEqual(getBarDiv().style.width, '100%');
+            assert.strictEqual(getBarDiv()!.style.width, '100%');
 
             act(() => {
                 t.mock.timers.tick(UPDATE_TIME);
@@ -403,7 +410,7 @@ describe('LoadingBar', () => {
                 setProps({ loading: 1 });
             });
 
-            const percent = parseFloat(getBarDiv().style.width);
+            const percent = parseFloat(getBarDiv()!.style.width);
             assert.notStrictEqual(percent, 100);
 
             act(() => {
@@ -499,7 +506,7 @@ describe('LoadingBar', () => {
             });
 
             const bar = getBarDiv();
-            const percent = parseFloat(bar.style.width);
+            const percent = parseFloat(bar!.style.width);
             assert.ok(percent < maxProgress, `Expected ${percent} < ${maxProgress}`);
         });
     });
@@ -518,7 +525,7 @@ describe('LoadingBar', () => {
             });
 
             const bar = getBarDiv();
-            assert.strictEqual(bar.style.width, `${progressIncrease}%`);
+            assert.strictEqual(bar!.style.width, `${progressIncrease}%`);
         });
     });
 
@@ -535,8 +542,8 @@ describe('LoadingBar', () => {
             });
 
             const outer = getOuterDiv();
-            assert.strictEqual(outer.style.direction, 'ltr');
-            assert.strictEqual(getBarDiv().style.width, '20%');
+            assert.strictEqual(outer!.style.direction, 'ltr');
+            assert.strictEqual(getBarDiv()!.style.width, '20%');
         });
 
         it('can simulate progress from right to left', (t) => {
@@ -551,8 +558,8 @@ describe('LoadingBar', () => {
             });
 
             const outer = getOuterDiv();
-            assert.strictEqual(outer.style.direction, 'rtl');
-            assert.strictEqual(getBarDiv().style.width, '20%');
+            assert.strictEqual(outer!.style.direction, 'rtl');
+            assert.strictEqual(getBarDiv()!.style.width, '20%');
         });
     });
 
@@ -601,7 +608,7 @@ describe('LoadingBar', () => {
         it('renders multiple instances independently', (t) => {
             t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
 
-            function MultiWrapper() {
+            function MultiWrapper(): ReactElement {
                 return React.createElement(
                     'section',
                     null,
@@ -620,12 +627,12 @@ describe('LoadingBar', () => {
             const section = container.querySelector('section');
             assert.ok(section);
 
-            const firstBar = section.children[0].children[0];
+            const firstBar = (section.children[0] as HTMLElement).children[0] as HTMLElement;
             assert.strictEqual(firstBar.className, '');
             assert.strictEqual(firstBar.style.backgroundColor, 'red');
             assert.strictEqual(firstBar.style.height, '3px');
 
-            const secondBar = section.children[1].children[0];
+            const secondBar = (section.children[1] as HTMLElement).children[0] as HTMLElement;
             assert.strictEqual(secondBar.className, 'custom');
             assert.strictEqual(secondBar.style.backgroundColor, '');
             assert.strictEqual(secondBar.style.height, '');

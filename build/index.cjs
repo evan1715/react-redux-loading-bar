@@ -1,3 +1,4 @@
+"use strict";
 var __defProp = Object.defineProperty;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __getOwnPropNames = Object.getOwnPropertyNames;
@@ -16,7 +17,7 @@ var __copyProps = (to, from, except, desc) => {
 };
 var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
 
-// src/index.js
+// src/index.ts
 var index_exports = {};
 __export(index_exports, {
   DEFAULT_SCOPE: () => DEFAULT_SCOPE,
@@ -34,11 +35,11 @@ __export(index_exports, {
 });
 module.exports = __toCommonJS(index_exports);
 
-// src/loading_bar.js
+// src/loading_bar.tsx
 var import_react = require("react");
 var import_react_redux = require("react-redux");
 
-// src/loading_bar_ducks.js
+// src/loading_bar_ducks.ts
 var SHOW = "loading-bar/SHOW";
 var HIDE = "loading-bar/HIDE";
 var RESET = "loading-bar/RESET";
@@ -62,17 +63,17 @@ function resetLoading(scope = DEFAULT_SCOPE) {
   };
 }
 function loadingBarReducer(state = {}, action = {}) {
-  const { scope = DEFAULT_SCOPE } = action.payload || {};
+  const { scope = DEFAULT_SCOPE } = action.payload ?? {};
   switch (action.type) {
     case SHOW:
       return {
         ...state,
-        [scope]: (state[scope] || 0) + 1
+        [scope]: (state[scope] ?? 0) + 1
       };
     case HIDE:
       return {
         ...state,
-        [scope]: Math.max(0, (state[scope] || 1) - 1)
+        [scope]: Math.max(0, (state[scope] ?? 1) - 1)
       };
     case RESET:
       return {
@@ -84,7 +85,7 @@ function loadingBarReducer(state = {}, action = {}) {
   }
 }
 
-// src/loading_bar.js
+// src/loading_bar.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
 var UPDATE_TIME = 400;
 var MAX_PROGRESS = 99;
@@ -121,7 +122,9 @@ function LoadingBar({
     setStatus("hidden");
   }, []);
   const stop = (0, import_react.useCallback)(() => {
-    clearInterval(progressIntervalId.current);
+    if (progressIntervalId.current !== null) {
+      clearInterval(progressIntervalId.current);
+    }
     progressIntervalId.current = null;
     const currentPercent = percentRef.current;
     const isShown = currentPercent > 0 && currentPercent <= 100;
@@ -163,8 +166,12 @@ function LoadingBar({
   }, [loading, start, stop]);
   (0, import_react.useEffect)(() => {
     return () => {
-      clearInterval(progressIntervalId.current);
-      clearTimeout(terminatingAnimationTimeoutId.current);
+      if (progressIntervalId.current !== null) {
+        clearInterval(progressIntervalId.current);
+      }
+      if (terminatingAnimationTimeoutId.current !== null) {
+        clearTimeout(terminatingAnimationTimeoutId.current);
+      }
     };
   }, []);
   if (status === "hidden") {
@@ -190,25 +197,26 @@ function LoadingBar({
 }
 function ConnectedLoadingBar({ scope = DEFAULT_SCOPE, ...props }) {
   const loading = (0, import_react_redux.useSelector)((state) => state.loadingBar[scope]);
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoadingBar, { ...props, scope, loading: loading || 0 });
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(LoadingBar, { ...props, scope, loading: loading ?? 0 });
 }
 var loading_bar_default = ConnectedLoadingBar;
 
-// src/loading_bar_middleware.js
+// src/loading_bar_middleware.ts
 var defaultTypeSuffixes = ["PENDING", "FULFILLED", "REJECTED"];
 function loadingBarMiddleware(config = {}) {
-  const promiseTypeSuffixes = config.promiseTypeSuffixes || defaultTypeSuffixes;
-  const scope = config.scope || DEFAULT_SCOPE;
+  const promiseTypeSuffixes = config.promiseTypeSuffixes ?? defaultTypeSuffixes;
+  const scope = config.scope ?? DEFAULT_SCOPE;
   return ({ dispatch }) => (next) => (action) => {
-    if (action.type) {
+    const typedAction = action;
+    if (typedAction.type) {
       const [PENDING, FULFILLED, REJECTED] = promiseTypeSuffixes;
       const isPending = new RegExp(`${PENDING}$`, "g");
       const isFulfilled = new RegExp(`${FULFILLED}$`, "g");
       const isRejected = new RegExp(`${REJECTED}$`, "g");
-      const actionScope = action.meta && action.meta.scope || action.scope || scope;
-      if (action.type.match(isPending)) {
+      const actionScope = typedAction.meta?.scope ?? typedAction.scope ?? scope;
+      if (isPending.test(typedAction.type)) {
         dispatch(showLoading(actionScope));
-      } else if (action.type.match(isFulfilled) || action.type.match(isRejected)) {
+      } else if (isFulfilled.test(typedAction.type) || isRejected.test(typedAction.type)) {
         dispatch(hideLoading(actionScope));
       }
     }
@@ -216,13 +224,13 @@ function loadingBarMiddleware(config = {}) {
   };
 }
 
-// src/immutable.js
+// src/immutable.tsx
 var import_react_redux2 = require("react-redux");
 var import_jsx_runtime2 = require("react/jsx-runtime");
 function ImmutableLoadingBar({ scope = DEFAULT_SCOPE, ...props }) {
   const loading = (0, import_react_redux2.useSelector)((state) => state.get("loadingBar")[scope]);
-  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(LoadingBar, { ...props, scope, loading: loading || 0 });
+  return /* @__PURE__ */ (0, import_jsx_runtime2.jsx)(LoadingBar, { ...props, scope, loading: loading ?? 0 });
 }
 
-// src/index.js
+// src/index.ts
 var index_default = loading_bar_default;

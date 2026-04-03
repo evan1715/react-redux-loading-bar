@@ -1,11 +1,11 @@
 import { build } from 'esbuild';
 
 const shared = {
-    entryPoints: ['src/index.js'],
+    entryPoints: ['src/index.ts'],
     bundle: true,
     external: ['react', 'react-dom', 'react-redux', 'redux'],
     jsx: 'automatic',
-    loader: { '.js': 'jsx' },
+    loader: { '.ts': 'ts', '.tsx': 'tsx' },
     target: 'es2022',
     minify: false,
 };

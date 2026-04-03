@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { transformSync } from 'esbuild';
 
 export async function load(url, context, nextLoad) {
-    if (url.startsWith('file://') && (url.endsWith('.js') || url.endsWith('.jsx'))) {
+    if (url.startsWith('file://')) {
         const filePath = fileURLToPath(url);
 
         // Skip node_modules
@@ -12,12 +12,25 @@ export async function load(url, context, nextLoad) {
             return nextLoad(url, context);
         }
 
-        const source = readFileSync(filePath, 'utf8');
-
-        // Only transform if it contains JSX-like syntax
-        if (source.includes('/>') || source.includes('</')) {
+        if (url.endsWith('.ts')) {
+            const source = readFileSync(filePath, 'utf8');
             const { code } = transformSync(source, {
-                loader: 'jsx',
+                loader: 'ts',
+                format: 'esm',
+                target: 'es2022',
+                sourcefile: filePath,
+            });
+            return {
+                format: 'module',
+                source: code,
+                shortCircuit: true,
+            };
+        }
+
+        if (url.endsWith('.tsx')) {
+            const source = readFileSync(filePath, 'utf8');
+            const { code } = transformSync(source, {
+                loader: 'tsx',
                 jsx: 'automatic',
                 format: 'esm',
                 target: 'es2022',
@@ -28,6 +41,26 @@ export async function load(url, context, nextLoad) {
                 source: code,
                 shortCircuit: true,
             };
+        }
+
+        if (url.endsWith('.js') || url.endsWith('.jsx')) {
+            const source = readFileSync(filePath, 'utf8');
+
+            // Only transform if it contains JSX-like syntax
+            if (source.includes('/>') || source.includes('</')) {
+                const { code } = transformSync(source, {
+                    loader: 'jsx',
+                    jsx: 'automatic',
+                    format: 'esm',
+                    target: 'es2022',
+                    sourcefile: filePath,
+                });
+                return {
+                    format: 'module',
+                    source: code,
+                    shortCircuit: true,
+                };
+            }
         }
     }
 

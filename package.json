@@ -7,14 +7,16 @@
     "module": "build/index.js",
     "exports": {
         ".": {
+            "types": "./build/src/index.d.ts",
             "import": "./build/index.js",
             "require": "./build/index.cjs"
         }
     },
-    "types": "index.d.ts",
+    "types": "build/src/index.d.ts",
     "scripts": {
-        "build": "node esbuild.config.js",
-        "test": "node --import ./jsx-loader.js --test spec/*.js"
+        "build": "tsc && node esbuild.config.js",
+        "test": "node --import ./jsx-loader.js --test spec/*.ts spec/*.tsx",
+        "typecheck": "tsc --noEmit"
     },
     "license": "MIT",
     "peerDependencies": {
@@ -23,11 +25,14 @@
         "redux": "^5.0.0"
     },
     "devDependencies": {
+        "@types/react": "^19.2.14",
+        "@types/react-dom": "^19.2.3",
         "esbuild": "^0.28.0",
         "jsdom": "^29.0.1",
         "react": "^19.2.4",
         "react-dom": "^19.2.4",
         "react-redux": "^9.2.0",
-        "redux": "^5.0.1"
+        "redux": "^5.0.1",
+        "typescript": "^6.0.2"
     }
 }

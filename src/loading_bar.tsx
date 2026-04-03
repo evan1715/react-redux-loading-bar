@@ -1,7 +1,9 @@
+import type { CSSProperties, ReactElement } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 
-import { DEFAULT_SCOPE } from './loading_bar_ducks.js';
+import { DEFAULT_SCOPE } from './loading_bar_ducks.ts';
+import type { LoadingBarState } from './loading_bar_ducks.ts';
 
 export const UPDATE_TIME = 400;
 export const MAX_PROGRESS = 99;
@@ -9,12 +11,28 @@ export const PROGRESS_INCREASE = 20;
 export const ANIMATION_DURATION = UPDATE_TIME * 2;
 export const TERMINATING_ANIMATION_DURATION = UPDATE_TIME / 2;
 
-function newPercent(percent, progressIncrease) {
+type LoadingBarStatus = 'hidden' | 'running' | 'starting' | 'stopping';
+
+function newPercent(percent: number, progressIncrease: number): number {
     // Use cosine as a smoothing function
     // It could be any function to slow down progress near the ending 100%
     const smoothedProgressIncrease = progressIncrease * Math.cos(percent * (Math.PI / 2 / 100));
     return percent + smoothedProgressIncrease;
 }
+
+export interface LoadingBarProps {
+    loading?: number;
+    scope?: string;
+    className?: string;
+    direction?: 'ltr' | 'rtl';
+    maxProgress?: number;
+    progressIncrease?: number;
+    showFastActions?: boolean;
+    style?: CSSProperties;
+    updateTime?: number;
+}
+
+export type LoadingBarContainerProps = Omit<LoadingBarProps, 'loading'>;
 
 export function LoadingBar({
     loading = 0,
@@ -26,12 +44,12 @@ export function LoadingBar({
     showFastActions = false,
     style: customStyle = {},
     updateTime = UPDATE_TIME,
-}) {
+}: LoadingBarProps): ReactElement | null {
     const [percent, setPercent] = useState(0);
-    const [status, setStatus] = useState('hidden');
+    const [status, setStatus] = useState<LoadingBarStatus>('hidden');
 
-    const progressIntervalId = useRef(null);
-    const terminatingAnimationTimeoutId = useRef(null);
+    const progressIntervalId = useRef<ReturnType<typeof setInterval> | null>(null);
+    const terminatingAnimationTimeoutId = useRef<ReturnType<typeof setTimeout> | null>(null);
     const prevLoadingRef = useRef(loading);
     const statusRef = useRef(status);
     const percentRef = useRef(percent);
@@ -47,7 +65,9 @@ export function LoadingBar({
     }, []);
 
     const stop = useCallback(() => {
-        clearInterval(progressIntervalId.current);
+        if (progressIntervalId.current !== null) {
+            clearInterval(progressIntervalId.current);
+        }
         progressIntervalId.current = null;
 
         const currentPercent = percentRef.current;
@@ -108,8 +128,12 @@ export function LoadingBar({
     // Cleanup on unmount
     useEffect(() => {
         return () => {
-            clearInterval(progressIntervalId.current);
-            clearTimeout(terminatingAnimationTimeoutId.current);
+            if (progressIntervalId.current !== null) {
+                clearInterval(progressIntervalId.current);
+            }
+            if (terminatingAnimationTimeoutId.current !== null) {
+                clearTimeout(terminatingAnimationTimeoutId.current);
+            }
         };
     }, []);
 
@@ -119,7 +143,7 @@ export function LoadingBar({
 
     const animationDuration = status === 'stopping' ? TERMINATING_ANIMATION_DURATION : ANIMATION_DURATION;
 
-    const barStyle = {
+    const barStyle: CSSProperties = {
         width: `${percent}%`,
         transition: `width ${animationDuration}ms linear`,
         willChange: 'width, opacity',
@@ -134,7 +158,7 @@ export function LoadingBar({
 
     barStyle.opacity = percent > 0 && percent <= 100 ? '1' : '0';
 
-    const finalStyle = { ...barStyle, ...customStyle };
+    const finalStyle: CSSProperties = { ...barStyle, ...customStyle };
 
     return (
         <div style={{ direction }}>
@@ -144,10 +168,14 @@ export function LoadingBar({
     );
 }
 
+interface RootState {
+    loadingBar: LoadingBarState;
+}
+
 // Connected version using react-redux hooks
-export function ConnectedLoadingBar({ scope = DEFAULT_SCOPE, ...props }) {
-    const loading = useSelector((state) => state.loadingBar[scope]);
-    return <LoadingBar {...props} scope={scope} loading={loading || 0} />;
+export function ConnectedLoadingBar({ scope = DEFAULT_SCOPE, ...props }: LoadingBarContainerProps): ReactElement | null {
+    const loading = useSelector((state: RootState) => state.loadingBar[scope]);
+    return <LoadingBar {...props} scope={scope} loading={loading ?? 0} />;
 }
 
 export default ConnectedLoadingBar;
