@@ -1,13 +1,14 @@
+import type { UnknownAction } from 'redux';
+
 export const SHOW = 'loading-bar/SHOW' as const;
 export const HIDE = 'loading-bar/HIDE' as const;
 export const RESET = 'loading-bar/RESET' as const;
 
 export const DEFAULT_SCOPE = 'default';
 
-export interface LoadingBarAction {
+export interface LoadingBarAction extends UnknownAction {
     type: typeof SHOW | typeof HIDE | typeof RESET;
     payload: { scope: string };
-    [key: string]: unknown;
 }
 
 export interface LoadingBarState {

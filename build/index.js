@@ -166,20 +166,22 @@ var loading_bar_default = ConnectedLoadingBar;
 
 // src/loading_bar_middleware.ts
 var defaultTypeSuffixes = ["PENDING", "FULFILLED", "REJECTED"];
+function isActionWithType(action) {
+  return typeof action === "object" && action !== null && "type" in action && typeof action.type === "string";
+}
 function loadingBarMiddleware(config = {}) {
   const promiseTypeSuffixes = config.promiseTypeSuffixes ?? defaultTypeSuffixes;
   const scope = config.scope ?? DEFAULT_SCOPE;
   return ({ dispatch }) => (next) => (action) => {
-    const typedAction = action;
-    if (typedAction.type) {
+    if (isActionWithType(action)) {
       const [PENDING, FULFILLED, REJECTED] = promiseTypeSuffixes;
       const isPending = new RegExp(`${PENDING}$`, "g");
       const isFulfilled = new RegExp(`${FULFILLED}$`, "g");
       const isRejected = new RegExp(`${REJECTED}$`, "g");
-      const actionScope = typedAction.meta?.scope ?? typedAction.scope ?? scope;
-      if (isPending.test(typedAction.type)) {
+      const actionScope = action.meta?.scope ?? action.scope ?? scope;
+      if (isPending.test(action.type)) {
         dispatch(showLoading(actionScope));
-      } else if (isFulfilled.test(typedAction.type) || isRejected.test(typedAction.type)) {
+      } else if (isFulfilled.test(action.type) || isRejected.test(action.type)) {
         dispatch(hideLoading(actionScope));
       }
     }

@@ -6,51 +6,54 @@ import type { Dispatch, UnknownAction } from 'redux';
 import loadingBarMiddleware from '../src/loading_bar_middleware.ts';
 import { hideLoading, showLoading } from '../src/loading_bar_ducks.ts';
 
-interface MockStore {
+interface MockStoreAPI {
     getState(): void;
-    dispatch: Dispatch;
+    dispatch: (action: unknown) => unknown;
 }
 
 function createMockStore(
     middlewares: ReturnType<typeof loadingBarMiddleware>[],
-    mockDispatch: Dispatch,
-): MockStore {
-    const store: MockStore = {
+    mockDispatch: (action: unknown) => unknown,
+): MockStoreAPI {
+    const store = {
         getState() {},
         dispatch: mockDispatch,
     };
 
-    let dispatch: Dispatch = mockDispatch;
+    let next: (action: unknown) => unknown = mockDispatch;
     const chain = middlewares.map((mw) => mw(store));
     for (let i = chain.length - 1; i >= 0; i--) {
-        dispatch = chain[i]!(dispatch) as Dispatch;
+        const middleware = chain[i];
+        assert.ok(middleware, `middleware at index ${i} should exist`);
+        next = middleware(next);
     }
 
-    return { ...store, dispatch };
+    return { ...store, dispatch: next };
 }
 
 describe('loadingBarMiddleware', () => {
-    const mockStore = (mockDispatch: Dispatch): MockStore =>
+    const mockStore = (mockDispatch: (action: unknown) => unknown): MockStoreAPI =>
         createMockStore([loadingBarMiddleware()], mockDispatch);
 
     it('returns a function to handle next', () => {
-        const mockDispatch: Dispatch = (() => {}) as Dispatch;
-        const nextHandler = loadingBarMiddleware()(mockDispatch as unknown as { dispatch: Dispatch });
+        const noopDispatch: Dispatch = <T extends UnknownAction>(action: T): T => action;
+        const storeAPI = { getState() {}, dispatch: noopDispatch };
+        const nextHandler = loadingBarMiddleware()(storeAPI);
         assert.strictEqual(typeof nextHandler, 'function');
     });
 
     describe('with an action containing "_PENDING" in type', () => {
         it('dispatches SHOW action', () => {
             const originalAction: UnknownAction = { type: 'something/FETCH_PENDING' };
-            const expectedActions = [showLoading(), originalAction];
+            const expectedActions: UnknownAction[] = [showLoading(), originalAction];
 
-            const mockDispatch: Dispatch = ((action: UnknownAction) => {
+            const store = mockStore((action) => {
                 const expectedAction = expectedActions.shift();
                 assert.deepStrictEqual(action, expectedAction);
                 return action;
-            }) as Dispatch;
+            });
 
-            mockStore(mockDispatch).dispatch(originalAction);
+            store.dispatch(originalAction);
             assert.strictEqual(expectedActions.length, 0);
         });
     });
@@ -58,15 +61,15 @@ describe('loadingBarMiddleware', () => {
     describe('with an action containing "_FULFILLED" in type', () => {
         it('dispatches HIDE action', () => {
             const originalAction: UnknownAction = { type: 'something/FETCH_FULFILLED' };
-            const expectedActions = [hideLoading(), originalAction];
+            const expectedActions: UnknownAction[] = [hideLoading(), originalAction];
 
-            const mockDispatch: Dispatch = ((action: UnknownAction) => {
+            const store = mockStore((action) => {
                 const expectedAction = expectedActions.shift();
                 assert.deepStrictEqual(action, expectedAction);
                 return action;
-            }) as Dispatch;
+            });
 
-            mockStore(mockDispatch).dispatch(originalAction);
+            store.dispatch(originalAction);
             assert.strictEqual(expectedActions.length, 0);
         });
     });
@@ -74,15 +77,15 @@ describe('loadingBarMiddleware', () => {
     describe('with an action containing "_REJECTED" in type', () => {
         it('dispatches HIDE action', () => {
             const originalAction: UnknownAction = { type: 'something/FETCH_REJECTED' };
-            const expectedActions = [hideLoading(), originalAction];
+            const expectedActions: UnknownAction[] = [hideLoading(), originalAction];
 
-            const mockDispatch: Dispatch = ((action: UnknownAction) => {
+            const store = mockStore((action) => {
                 const expectedAction = expectedActions.shift();
                 assert.deepStrictEqual(action, expectedAction);
                 return action;
-            }) as Dispatch;
+            });
 
-            mockStore(mockDispatch).dispatch(originalAction);
+            store.dispatch(originalAction);
             assert.strictEqual(expectedActions.length, 0);
         });
     });
@@ -90,37 +93,37 @@ describe('loadingBarMiddleware', () => {
     describe('with an action not containing promise suffixes in type', () => {
         it('does not dispatch SHOW and HIDE actions', () => {
             const originalAction: UnknownAction = { type: 'something/RANDOM' };
-            const expectedActions = [originalAction];
+            const expectedActions: UnknownAction[] = [originalAction];
 
-            const mockDispatch: Dispatch = ((action: UnknownAction) => {
+            const store = mockStore((action) => {
                 const expectedAction = expectedActions.shift();
                 assert.deepStrictEqual(action, expectedAction);
                 return action;
-            }) as Dispatch;
+            });
 
-            mockStore(mockDispatch).dispatch(originalAction);
+            store.dispatch(originalAction);
             assert.strictEqual(expectedActions.length, 0);
         });
     });
 
     describe('with an async action', () => {
         it('does not dispatch SHOW and HIDE actions', () => {
-            const originalAction = (() => {}) as unknown as UnknownAction;
-            const expectedActions = [originalAction];
+            const originalAction: UnknownAction = Object.assign(() => {}, { type: '@@thunk' });
+            const expectedActions: unknown[] = [originalAction];
 
-            const mockDispatch: Dispatch = ((action: UnknownAction) => {
+            const store = mockStore((action) => {
                 const expectedAction = expectedActions.shift();
                 assert.strictEqual(action, expectedAction);
                 return action;
-            }) as Dispatch;
+            });
 
-            mockStore(mockDispatch).dispatch(originalAction);
+            store.dispatch(originalAction);
             assert.strictEqual(expectedActions.length, 0);
         });
     });
 
     describe('with custom promiseTypeSuffixes', () => {
-        const mockStoreWithSuffixes = (mockDispatch: Dispatch): MockStore =>
+        const mockStoreWithSuffixes = (mockDispatch: (action: unknown) => unknown): MockStoreAPI =>
             createMockStore(
                 [loadingBarMiddleware({ promiseTypeSuffixes: ['LOAD', 'SUCCESS', 'FAIL'] })],
                 mockDispatch
@@ -128,92 +131,92 @@ describe('loadingBarMiddleware', () => {
 
         it('does not dispatch SHOW and HIDE actions on _FULFILLED action', () => {
             const originalAction: UnknownAction = { type: 'something/FETCH_PENDING' };
-            const expectedActions = [originalAction];
+            const expectedActions: UnknownAction[] = [originalAction];
 
-            const mockDispatch: Dispatch = ((action: UnknownAction) => {
+            const store = mockStoreWithSuffixes((action) => {
                 const expectedAction = expectedActions.shift();
                 assert.deepStrictEqual(action, expectedAction);
                 return action;
-            }) as Dispatch;
+            });
 
-            mockStoreWithSuffixes(mockDispatch).dispatch(originalAction);
+            store.dispatch(originalAction);
             assert.strictEqual(expectedActions.length, 0);
         });
 
         it('dispatches SHOW action on _LOAD action', () => {
             const originalAction: UnknownAction = { type: 'something/FETCH_LOAD' };
-            const expectedActions = [showLoading(), originalAction];
+            const expectedActions: UnknownAction[] = [showLoading(), originalAction];
 
-            const mockDispatch: Dispatch = ((action: UnknownAction) => {
+            const store = mockStoreWithSuffixes((action) => {
                 const expectedAction = expectedActions.shift();
                 assert.deepStrictEqual(action, expectedAction);
                 return action;
-            }) as Dispatch;
+            });
 
-            mockStoreWithSuffixes(mockDispatch).dispatch(originalAction);
+            store.dispatch(originalAction);
             assert.strictEqual(expectedActions.length, 0);
         });
 
         it('dispatches HIDE action on _SUCCESS action', () => {
             const originalAction: UnknownAction = { type: 'something/FETCH_SUCCESS' };
-            const expectedActions = [hideLoading(), originalAction];
+            const expectedActions: UnknownAction[] = [hideLoading(), originalAction];
 
-            const mockDispatch: Dispatch = ((action: UnknownAction) => {
+            const store = mockStoreWithSuffixes((action) => {
                 const expectedAction = expectedActions.shift();
                 assert.deepStrictEqual(action, expectedAction);
                 return action;
-            }) as Dispatch;
+            });
 
-            mockStoreWithSuffixes(mockDispatch).dispatch(originalAction);
+            store.dispatch(originalAction);
             assert.strictEqual(expectedActions.length, 0);
         });
 
         it('dispatches HIDE action on _FAIL action', () => {
             const originalAction: UnknownAction = { type: 'something/FETCH_FAIL' };
-            const expectedActions = [hideLoading(), originalAction];
+            const expectedActions: UnknownAction[] = [hideLoading(), originalAction];
 
-            const mockDispatch: Dispatch = ((action: UnknownAction) => {
+            const store = mockStoreWithSuffixes((action) => {
                 const expectedAction = expectedActions.shift();
                 assert.deepStrictEqual(action, expectedAction);
                 return action;
-            }) as Dispatch;
+            });
 
-            mockStoreWithSuffixes(mockDispatch).dispatch(originalAction);
+            store.dispatch(originalAction);
             assert.strictEqual(expectedActions.length, 0);
         });
 
         it('does not dispatch SHOW action on FOO_LOADED action', () => {
             const originalAction: UnknownAction = { type: 'something/FOO_LOADED' };
-            const expectedActions = [originalAction];
+            const expectedActions: UnknownAction[] = [originalAction];
 
-            const mockDispatch: Dispatch = ((action: UnknownAction) => {
+            const store = mockStoreWithSuffixes((action) => {
                 const expectedAction = expectedActions.shift();
                 assert.deepStrictEqual(action, expectedAction);
                 return action;
-            }) as Dispatch;
+            });
 
-            mockStoreWithSuffixes(mockDispatch).dispatch(originalAction);
+            store.dispatch(originalAction);
             assert.strictEqual(expectedActions.length, 0);
         });
     });
 
     describe('with custom scope', () => {
         const CUSTOM_SCOPE = 'someScope';
-        const mockStoreWithCustomScope = (mockDispatch: Dispatch): MockStore =>
+        const mockStoreWithCustomScope = (mockDispatch: (action: unknown) => unknown): MockStoreAPI =>
             createMockStore([loadingBarMiddleware({ scope: CUSTOM_SCOPE })], mockDispatch);
 
         describe('with an action containing "_PENDING" in type', () => {
             it('dispatches SHOW action', () => {
                 const originalAction: UnknownAction = { type: 'something/FETCH_PENDING' };
-                const expectedActions = [showLoading(CUSTOM_SCOPE), originalAction];
+                const expectedActions: UnknownAction[] = [showLoading(CUSTOM_SCOPE), originalAction];
 
-                const mockDispatch: Dispatch = ((action: UnknownAction) => {
+                const store = mockStoreWithCustomScope((action) => {
                     const expectedAction = expectedActions.shift();
                     assert.deepStrictEqual(action, expectedAction);
                     return action;
-                }) as Dispatch;
+                });
 
-                mockStoreWithCustomScope(mockDispatch).dispatch(originalAction);
+                store.dispatch(originalAction);
                 assert.strictEqual(expectedActions.length, 0);
             });
         });
@@ -221,15 +224,15 @@ describe('loadingBarMiddleware', () => {
         describe('with an action containing "_FULFILLED" in type', () => {
             it('dispatches HIDE action', () => {
                 const originalAction: UnknownAction = { type: 'something/FETCH_FULFILLED' };
-                const expectedActions = [hideLoading(CUSTOM_SCOPE), originalAction];
+                const expectedActions: UnknownAction[] = [hideLoading(CUSTOM_SCOPE), originalAction];
 
-                const mockDispatch: Dispatch = ((action: UnknownAction) => {
+                const store = mockStoreWithCustomScope((action) => {
                     const expectedAction = expectedActions.shift();
                     assert.deepStrictEqual(action, expectedAction);
                     return action;
-                }) as Dispatch;
+                });
 
-                mockStoreWithCustomScope(mockDispatch).dispatch(originalAction);
+                store.dispatch(originalAction);
                 assert.strictEqual(expectedActions.length, 0);
             });
         });
@@ -237,15 +240,15 @@ describe('loadingBarMiddleware', () => {
         describe('with an action containing "_REJECTED" in type', () => {
             it('dispatches HIDE action', () => {
                 const originalAction: UnknownAction = { type: 'something/FETCH_REJECTED' };
-                const expectedActions = [hideLoading(CUSTOM_SCOPE), originalAction];
+                const expectedActions: UnknownAction[] = [hideLoading(CUSTOM_SCOPE), originalAction];
 
-                const mockDispatch: Dispatch = ((action: UnknownAction) => {
+                const store = mockStoreWithCustomScope((action) => {
                     const expectedAction = expectedActions.shift();
                     assert.deepStrictEqual(action, expectedAction);
                     return action;
-                }) as Dispatch;
+                });
 
-                mockStoreWithCustomScope(mockDispatch).dispatch(originalAction);
+                store.dispatch(originalAction);
                 assert.strictEqual(expectedActions.length, 0);
             });
         });
